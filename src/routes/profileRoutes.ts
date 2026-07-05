@@ -1,4 +1,3 @@
-// 📁 routes/profileRoutes.ts
 import express from "express";
 import { protect } from "../middlewares/authMiddleware";
 import { asyncHandler } from "../utils/asyncHandler";

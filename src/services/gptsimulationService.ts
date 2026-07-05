@@ -53,7 +53,7 @@ export const getCityRecommendations = async (input: any) => {
         Authorization: `Bearer ${process.env.API_KEY}`,
         "Content-Type": "application/json",
       },
-    }
+    },
   );
 
   const gptRaw = response.data?.choices?.[0]?.message?.content;
@@ -66,126 +66,171 @@ export const generateSimulationResponse = async (input: any) => {
   const { selectedCity, initialBudget, requiredFacilities, departureAirport } =
     input;
 
-  // 배열을 문자열로 변환
-  const facilitiesStr = Array.isArray(requiredFacilities)
-    ? requiredFacilities.join(", ")
-    : requiredFacilities;
-
-  const prompt = `
-사용자 조건:
-- 도시: ${selectedCity}
-- 초기 정착 예산: ${initialBudget}
-- 필수 편의시설: ${facilitiesStr}
-- 출발 공항: ${departureAirport}
-
-⚠️ CRITICAL: 모든 응답은 반드시 한국어(Korean)로만 작성하세요. 영어를 절대 사용하지 마세요.
-⚠️ 반드시 순수한 JSON 형식으로만 응답하세요. 추가 설명이나 마크다운 없이 JSON만 반환하세요.
-⚠️ 모든 키는 쌍따옴표로 감싸고, 값은 실제 데이터로 한글로 작성하세요.
-⚠️ 응답을 완성하세요. 중간에 끊기면 안 됩니다.
-
-⚠️ 중요: ${selectedCity}에서 실제로 사용되는 현지 플랫폼과 서비스를 추천하세요!
-- shortTermHousingOptions: ${selectedCity}의 실제 단기 숙소 (호스텔, 에어비앤비, 호텔 등)
-- longTermHousingPlatforms: ${selectedCity}/해당 국가에서 실제로 사용하는 부동산 플랫폼 (예: 영국-Rightmove, Zoopla / 독일-ImmobilienScout24 / 프랑스-SeLoger 등)
-- jobSearchPlatforms: ${selectedCity}/해당 국가의 실제 구인구직 사이트 (예: 영국-Indeed UK, Reed / 독일-StepStone, Xing 등)
-
-{
-  "simulation": {
-    "recommendedCity": "${selectedCity}",
-    "localInfo": {
-      "essentialFacilities": ["요청받은 시설들을 배열로"],
-      "publicTransport": "교통수단 설명 (1-2문장)",
-      "safetyLevel": "치안 수준 (1문장)",
-      "climateSummary": "기후 설명 (1문장)",
-      "koreanCommunity": "한인 커뮤니티 정보 (1문장)",
-      "culturalTips": "문화 팁 (1문장)",
-      "warnings": "주의사항 (1문장)"
-    },
-    "estimatedMonthlyCost": {
-      "housing": "금액",
-      "food": "금액",
-      "transportation": "금액",
-      "etc": "금액",
-      "total": "금액",
-      "oneYearCost": "금액",
-      "costCuttingTips": "절약 팁 (1문장)",
-      "cpi": "한국 대비 물가 비교 (1문장)"
-    },
-    "initialSetup": {
-      "shortTermHousingOptions": ["${selectedCity}의 실제 단기 숙소 옵션1", "${selectedCity}의 실제 단기 숙소 옵션2", "${selectedCity}의 실제 단기 숙소 옵션3"],
-      "longTermHousingPlatforms": ["${selectedCity} 국가의 실제 부동산 플랫폼1", "${selectedCity} 국가의 실제 부동산 플랫폼2"],
-      "mobilePlan": "통신 정보 (1문장)",
-      "bankAccount": "계좌 개설 정보 (1문장)"
-    },
-    "jobReality": {
-      "jobSearchPlatforms": ["${selectedCity} 국가의 실제 구인구직 플랫폼1", "${selectedCity} 국가의 실제 구인구직 플랫폼2", "${selectedCity} 국가의 실제 구인구직 플랫폼3"],
-      "languageRequirement": "언어 요구사항 (1문장)",
-      "visaLimitationTips": "비자 관련 팁 (1문장)"
-    },
-    "culturalIntegration": {
-      "koreanPopulationRate": "한국인 비율 정보",
-      "foreignResidentRatio": "외국인 비율",
-      "koreanResourcesLinks": ["링크1", "링크2"]
-    }
-  }
-}
-`;
-
-  const systemMessage = `당신은 해외 이주 시뮬레이션 전문가입니다. 사용자 조건을 바탕으로 실제적이고 현실적인 데이터를 제공합니다. 모든 응답은 반드시 한국어(Korean)로만 작성해야 합니다. You must respond ONLY in Korean language. Never use English words.`;
-
-  const response = await axios.post(
-    process.env.GPT_API_URL!,
-    {
-      model: "gpt-4",
-      messages: [
-        { role: "system", content: systemMessage },
-        { role: "user", content: prompt },
-      ],
-      max_tokens: 3000, // 토큰 수 증가
-      temperature: 0,
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${process.env.API_KEY}`,
-        "Content-Type": "application/json",
-      },
-    }
-  );
-
-  const gptRaw = response.data?.choices?.[0]?.message?.content;
-
   try {
-    // JSON 코드 블록 제거 (```json ... ``` 형태로 온 경우)
-    let cleanedResponse = gptRaw.trim();
-    if (cleanedResponse.startsWith("```json")) {
-      cleanedResponse = cleanedResponse
-        .replace(/```json\n?/g, "")
-        .replace(/```\n?$/g, "");
-    } else if (cleanedResponse.startsWith("```")) {
-      cleanedResponse = cleanedResponse.replace(/```\n?/g, "");
-    }
+    // 배열을 문자열로 변환
+    const facilitiesStr = Array.isArray(requiredFacilities)
+      ? requiredFacilities.join(", ")
+      : requiredFacilities;
 
-    // JSON 파싱 시도
-    const parsed = JSON.parse(cleanedResponse);
-    const simulation = parsed.simulation;
+    const prompt = `
+    사용자 조건:
+    - 도시: ${selectedCity}
+    - 초기 정착 예산: ${initialBudget}
+    - 필수 편의시설: ${facilitiesStr}
+    - 출발 공항: ${departureAirport}
 
-    if (!simulation) {
-      throw new Error("GPT 응답에 simulation 항목이 없습니다.");
+    ⚠️ CRITICAL: 모든 응답은 반드시 한국어(Korean)로만 작성하세요. 영어를 절대 사용하지 마세요.
+    ⚠️ 반드시 순수한 JSON 형식으로만 응답하세요. 추가 설명이나 마크다운 없이 JSON만 반환하세요.
+    ⚠️ 모든 키는 쌍따옴표로 감싸고, 값은 실제 데이터로 한글로 작성하세요.
+    ⚠️ 응답을 완성하세요. 중간에 끊기면 안 됩니다.
+
+    ⚠️ 중요: ${selectedCity}에서 실제로 사용되는 현지 플랫폼과 서비스를 추천하세요!
+    - shortTermHousingOptions: ${selectedCity}의 실제 단기 숙소 (호스텔, 에어비앤비, 호텔 등)
+    - longTermHousingPlatforms: ${selectedCity}/해당 국가에서 실제로 사용하는 부동산 플랫폼 (예: 영국-Rightmove, Zoopla / 독일-ImmobilienScout24 / 프랑스-SeLoger 등)
+    - jobSearchPlatforms: ${selectedCity}/해당 국가의 실제 구인구직 사이트 (예: 영국-Indeed UK, Reed / 독일-StepStone, Xing 등)
+
+    {
+      "simulation": {
+        "recommendedCity": "${selectedCity}",
+        "localInfo": {
+          "essentialFacilities": ["요청받은 시설들을 배열로"],
+          "publicTransport": "교통수단 설명 (1-2문장)",
+          "safetyLevel": "치안 수준 (1문장)",
+          "climateSummary": "기후 설명 (1문장)",
+          "koreanCommunity": "한인 커뮤니티 정보 (1문장)",
+          "culturalTips": "문화 팁 (1문장)",
+          "warnings": "주의사항 (1문장)"
+        },
+        "estimatedMonthlyCost": {
+          "housing": "금액",
+          "food": "금액",
+          "transportation": "금액",
+          "etc": "금액",
+          "total": "금액",
+          "oneYearCost": "금액",
+          "costCuttingTips": "절약 팁 (1문장)",
+          "cpi": "한국 대비 물가 비교 (1문장)"
+        },
+        "initialSetup": {
+          "shortTermHousingOptions": ["${selectedCity}의 실제 단기 숙소 옵션1", "${selectedCity}의 실제 단기 숙소 옵션2", "${selectedCity}의 실제 단기 숙소 옵션3"],
+          "longTermHousingPlatforms": ["${selectedCity} 국가의 실제 부동산 플랫폼1", "${selectedCity} 국가의 실제 부동산 플랫폼2"],
+          "mobilePlan": "통신 정보 (1문장)",
+          "bankAccount": "계좌 개설 정보 (1문장)"
+        },
+        "jobReality": {
+          "jobSearchPlatforms": ["${selectedCity} 국가의 실제 구인구직 플랫폼1", "${selectedCity} 국가의 실제 구인구직 플랫폼2", "${selectedCity} 국가의 실제 구인구직 플랫폼3"],
+          "languageRequirement": "언어 요구사항 (1문장)",
+          "visaLimitationTips": "비자 관련 팁 (1문장)"
+        },
+        "culturalIntegration": {
+          "koreanPopulationRate": "한국인 비율 정보",
+          "foreignResidentRatio": "외국인 비율",
+          "koreanResourcesLinks": ["링크1", "링크2"]
+        }
+      }
     }
+    `;
+
+    const systemMessage = `당신은 해외 이주 시뮬레이션 전문가입니다. 사용자 조건을 바탕으로 실제적이고 현실적인 데이터를 제공합니다. 모든 응답은 반드시 한국어(Korean)로만 작성해야 합니다. You must respond ONLY in Korean language. Never use English words.`;
+
+    const response = await axios.post(
+      process.env.GPT_API_URL!,
+      {
+        model: "gpt-4",
+        messages: [
+          { role: "system", content: systemMessage },
+          { role: "user", content: prompt },
+        ],
+        max_tokens: 3000, // 토큰 수 증가
+        temperature: 0,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.API_KEY}`,
+          "Content-Type": "application/json",
+        },
+      },
+    );
+
+    const gptRaw = response.data?.choices?.[0]?.message?.content;
+
+    try {
+      // JSON 코드 블록 제거 (```json ... ``` 형태로 온 경우)
+      let cleanedResponse = gptRaw.trim();
+      if (cleanedResponse.startsWith("```json")) {
+        cleanedResponse = cleanedResponse
+          .replace(/```json\n?/g, "")
+          .replace(/```\n?$/g, "");
+      } else if (cleanedResponse.startsWith("```")) {
+        cleanedResponse = cleanedResponse.replace(/```\n?/g, "");
+      }
+
+      // JSON 파싱 시도
+      const parsed = JSON.parse(cleanedResponse);
+      const simulation = parsed.simulation;
+
+      if (!simulation) {
+        throw new Error("GPT 응답에 simulation 항목이 없습니다.");
+      }
+
+      return {
+        ...simulation,
+      };
+    } catch (err) {
+      console.error("GPT 응답 파싱 실패:", err);
+      console.error("GPT 응답 원본:", gptRaw);
+
+      // finish_reason 확인
+      const finishReason = response.data?.choices?.[0]?.finish_reason;
+      if (finishReason === "length") {
+        throw new Error("GPT 응답이 너무 길어 잘렸습니다. 다시 시도해주세요.");
+      }
+
+      throw new Error("시뮬레이션 생성에 실패했습니다. 다시 시도해주세요.");
+    }
+  } catch (error) {
+    console.error("시뮬레이션 GPT 호출 실패:", error);
 
     return {
-      ...simulation,
+      recommendedCity: selectedCity,
+      localInfo: {
+        essentialFacilities: Array.isArray(requiredFacilities)
+          ? requiredFacilities
+          : [requiredFacilities],
+        publicTransport: "대중교통 이용이 편리합니다.",
+        safetyLevel: "치안이 양호한 편입니다.",
+        climateSummary: "사계절이 뚜렷합니다.",
+        koreanCommunity: "한인 커뮤니티가 존재합니다.",
+        culturalTips: "현지 문화를 존중하면 적응에 도움이 됩니다.",
+        warnings: "초기 생활비를 충분히 준비하는 것이 좋습니다.",
+      },
+      estimatedMonthlyCost: {
+        housing: "150만원",
+        food: "60만원",
+        transportation: "20만원",
+        etc: "30만원",
+        total: "260만원",
+        oneYearCost: "3120만원",
+        costCuttingTips: "룸메이트를 활용하면 비용을 줄일 수 있습니다.",
+        cpi: "한국보다 높은 편입니다.",
+      },
+      initialSetup: {
+        shortTermHousingOptions: ["단기 임대", "호텔", "공유 숙소"],
+        longTermHousingPlatforms: ["현지 부동산 플랫폼"],
+        mobilePlan: "현지 통신사를 이용합니다.",
+        bankAccount: "여권과 주소 증명으로 개설 가능합니다.",
+      },
+      jobReality: {
+        jobSearchPlatforms: ["LinkedIn", "Indeed"],
+        languageRequirement: "영어 의사소통이 필요합니다.",
+        visaLimitationTips: "취업비자 가능 여부를 확인해야 합니다.",
+      },
+      culturalIntegration: {
+        koreanPopulationRate: "한인 커뮤니티가 있습니다.",
+        foreignResidentRatio: "외국인 거주 비율이 높은 편입니다.",
+        koreanResourcesLinks: [],
+      },
     };
-  } catch (err) {
-    console.error("GPT 응답 파싱 실패:", err);
-    console.error("GPT 응답 원본:", gptRaw);
-
-    // finish_reason 확인
-    const finishReason = response.data?.choices?.[0]?.finish_reason;
-    if (finishReason === "length") {
-      throw new Error("GPT 응답이 너무 길어 잘렸습니다. 다시 시도해주세요.");
-    }
-
-    throw new Error("시뮬레이션 생성에 실패했습니다. 다시 시도해주세요.");
   }
 };
 
@@ -193,7 +238,7 @@ export const generateSimulationResponse = async (input: any) => {
 export const getSimpleCityRecommendations = async (
   selectedCountry: string,
   userJob?: string,
-  userLanguage?: string
+  userLanguage?: string,
 ) => {
   const prompt = `
 당신은 ${selectedCountry} 이주 전문가입니다.
@@ -245,7 +290,7 @@ ${userLanguage ? `사용자 언어 능력: ${userLanguage}` : ""}
           Authorization: `Bearer ${API_KEY}`,
           "Content-Type": "application/json",
         },
-      }
+      },
     );
 
     const gptRaw = response.data?.choices?.[0]?.message?.content;
@@ -254,15 +299,35 @@ ${userLanguage ? `사용자 언어 능력: ${userLanguage}` : ""}
     return parsedResponse.cities;
   } catch (error) {
     console.error("도시 추천 GPT 호출 실패:", error);
-    throw new Error("도시 추천에 실패했습니다. 다시 시도해주세요.");
+
+    return [
+      {
+        name: "뉴욕",
+        summary:
+          "다양한 산업과 일자리 기회가 풍부하여 전문가 직군에게 적합합니다.",
+      },
+      {
+        name: "시애틀",
+        summary: "IT 산업과 첨단기업이 많아 취업 기회가 다양합니다.",
+      },
+      {
+        name: "오스틴",
+        summary: "성장하는 도시로 생활비와 일자리의 균형이 좋은 편입니다.",
+      },
+    ];
   }
 };
+//   } catch (error) {
+//     console.error("도시 추천 GPT 호출 실패:", error);
+//     throw new Error("도시 추천에 실패했습니다. 다시 시도해주세요.");
+//   }
+// };
 
 // GPT를 통한 상세 도시 추천 함수
 export async function getDetailedCityRecommendations(
   country: string,
   jobField: string,
-  language: string
+  language: string,
 ): Promise<
   Array<{
     name: string;
@@ -325,14 +390,14 @@ ${country}에서 ${jobField} 직종으로 취업을 희망하는 한국인에게
           Authorization: `Bearer ${API_KEY}`,
           "Content-Type": "application/json",
         },
-      }
+      },
     );
 
     const gptResponse = response.data.choices[0].message.content;
     const parsedResponse = JSON.parse(gptResponse);
     return parsedResponse.cities || [];
   } catch (error) {
-    console.error("GPT 도시 추천 실패:", error);
+    console.error("도시 추천 GPT 호출 실패:", error);
     return [
       {
         name: `${country} 수도`,

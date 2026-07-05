@@ -1,19 +1,19 @@
-import { Request, Response } from "express";
-import SimulationInput from "../models/simulationInput";
+import { RequestHandler } from "express";
+import { prisma } from "../db";
 
-// 인기 국가 순위 조회
-export const getPopularCountries = async (req: Request, res: Response) => {
+export const getPopularCountries: RequestHandler = async (req, res): Promise<void> => {
   try {
-    const countries = await SimulationInput.aggregate([
-      { $match: { selectedCountry: { $ne: null } } },
-      { $group: { _id: "$selectedCountry", count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-      { $limit: 5 },
-    ]);
+    const countries = await prisma.simulationInput.groupBy({
+      by: ["selectedCountry"],
+      where: { selectedCountry: { not: "" } },
+      _count: { selectedCountry: true },
+      orderBy: { _count: { selectedCountry: "desc" } },
+      take: 5,
+    });
 
     const result = countries.map((item) => ({
-      name: item._id,
-      count: item.count,
+      name: item.selectedCountry,
+      count: item._count.selectedCountry,
     }));
 
     res.status(200).json({
@@ -22,27 +22,23 @@ export const getPopularCountries = async (req: Request, res: Response) => {
       data: result,
     });
   } catch (err) {
-    res.status(500).json({
-      code: 500,
-      message: "서버 오류",
-      data: null,
-    });
+    res.status(500).json({ code: 500, message: "서버 오류", data: null });
   }
 };
 
-// 인기 도시 순위 조회
-export const getPopularCities = async (req: Request, res: Response) => {
+export const getPopularCities: RequestHandler = async (req, res): Promise<void> => {
   try {
-    const cities = await SimulationInput.aggregate([
-      { $match: { selectedCity: { $ne: null } } },
-      { $group: { _id: "$selectedCity", count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-      { $limit: 5 },
-    ]);
+    const cities = await prisma.simulationInput.groupBy({
+      by: ["selectedCity"],
+      where: { selectedCity: { not: null } },
+      _count: { selectedCity: true },
+      orderBy: { _count: { selectedCity: "desc" } },
+      take: 5,
+    });
 
     const result = cities.map((item) => ({
-      name: item._id,
-      count: item.count,
+      name: item.selectedCity,
+      count: item._count.selectedCity,
     }));
 
     res.status(200).json({
@@ -51,10 +47,6 @@ export const getPopularCities = async (req: Request, res: Response) => {
       data: result,
     });
   } catch (err) {
-    res.status(500).json({
-      code: 500,
-      message: "서버 오류",
-      data: null,
-    });
+    res.status(500).json({ code: 500, message: "서버 오류", data: null });
   }
 };

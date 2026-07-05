@@ -1,59 +1,97 @@
 import jwt from "jsonwebtoken";
-import { Request, Response, NextFunction } from "express";
-import User from "../models/User";
-import bcrypt from "bcrypt";
-import { UserDocument } from "../models/User";
+import { Request, RequestHandler } from "express";
+import { prisma } from "../db";
+import { AuthUser } from "../types/auth";
 
-interface AuthRequest extends Request {
-  user?: UserDocument;
-}
+export const protect: RequestHandler = async (req, res, next): Promise<void> => {
+  const token = req.headers.authorization;
 
-// JWT 인증 미들웨어
-export const protect = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-) => {
-  let token = req.headers.authorization;
-
-  if (token && token.startsWith("Bearer")) {
-    try {
-      const decoded: any = jwt.verify(
-        token.split(" ")[1],
-        process.env.JWT_SECRET!
-      );
-      req.user = await User.findById(decoded.id).select("-password");
-      next();
-    } catch (error) {
-      res.status(401).json({ message: "인증 실패: 유효하지 않은 토큰" });
-    }
-  } else {
+  if (!token || !token.startsWith("Bearer")) {
     res.status(401).json({ message: "토큰이 없습니다." });
+    return;
+  }
+
+  try {
+    const decoded = jwt.verify(
+      token.split(" ")[1],
+      process.env.JWT_SECRET!
+    ) as { id: string };
+
+    const user = await prisma.user.findUnique({
+      where: { id: Number(decoded.id) },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        birth: true,
+        phone: true,
+        kakaoId: true,
+        provider: true,
+        createdAt: true,
+      },
+    });
+
+    if (!user) {
+      res.status(401).json({
+        message: "인증 실패: 사용자를 찾을 수 없습니다.",
+      });
+      return;
+    }
+
+    req.user = {
+      ...user,
+      _id: user.id,
+    } as AuthUser;
+
+    next();
+  } catch (error) {
+    res.status(401).json({ message: "인증 실패: 유효하지 않은 토큰" });
+    return;
   }
 };
 
-// 선택적 JWT 인증 미들웨어 (토큰이 있으면 인증, 없으면 통과)
-export const optionalAuth = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-) => {
-  let token = req.headers.authorization;
+export const optionalAuth: RequestHandler = async (
+  req,
+  res,
+  next
+): Promise<void> => {
+  const token = req.headers.authorization;
 
   if (token && token.startsWith("Bearer")) {
     try {
-      const decoded: any = jwt.verify(
+      const decoded = jwt.verify(
         token.split(" ")[1],
         process.env.JWT_SECRET!
-      );
-      req.user = await User.findById(decoded.id).select("-password");
+      ) as { id: string };
+
+      const user = await prisma.user.findUnique({
+        where: { id: Number(decoded.id) },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          birth: true,
+          phone: true,
+          kakaoId: true,
+          provider: true,
+          createdAt: true,
+        },
+      });
+
+      if (user) {
+        req.user = {
+          ...user,
+          _id: user.id,
+        } as AuthUser;
+      }
     } catch (error) {
-      // 토큰이 유효하지 않아도 계속 진행 (req.user는 undefined)
       console.log("토큰 검증 실패, 비인증 상태로 진행:", error);
     }
   }
-  // 토큰이 없거나 유효하지 않아도 next() 호출
+
   next();
 };
 
-export { AuthRequest };
+export type AuthRequest = Request & {
+  user?: AuthUser;
+};
