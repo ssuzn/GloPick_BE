@@ -1,10 +1,17 @@
+import argparse
 import json
+import logging
 from pathlib import Path
 from datetime import datetime
 
 import numpy as np
 import pandas as pd
 from scipy import stats
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)s | %(message)s"
+)
 
 INDICATORS = ["income", "jobs", "health", "lifeSatisfaction", "safety"]
 
@@ -48,9 +55,44 @@ def to_0_100_score(z_scores: np.ndarray) -> np.ndarray:
     scores = z_scores * 18 + 50
     return np.clip(scores, 0, 100)
 
+def validate_input_data(df: pd.DataFrame) -> None:
+    required_columns = ["country", "countryCode", *INDICATORS]
 
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        raise ValueError(f"필수 컬럼 누락: {missing_columns}")
+
+    for indicator in INDICATORS:
+        if (df[indicator] < 0).any():
+            raise ValueError(f"{indicator} 컬럼에 음수 값이 있습니다.")
+
+        if (df[indicator] > 100).any():
+            raise ValueError(f"{indicator} 컬럼에 비정상적으로 큰 값이 있습니다.")
+          
+def parse_args():
+    parser = argparse.ArgumentParser(description="OECD BLI 데이터 전처리")
+    parser.add_argument(
+        "--input",
+        default=str(ROOT_DIR / "data" / "raw" / "oecd_bli_raw.csv"),
+        help="입력 CSV 경로",
+    )
+    parser.add_argument(
+        "--output",
+        default=str(ROOT_DIR / "data" / "oecd_processed.json"),
+        help="출력 JSON 경로",
+    )
+    return parser.parse_args()
+  
 def main():
-    df = pd.read_csv(RAW_PATH)
+    args = parse_args()
+
+    input_path = Path(args.input)
+    output_path = Path(args.output)
+
+    logging.info(f"입력 파일 로드: {input_path}")
+
+    df = pd.read_csv(input_path)
+    validate_input_data(df)
 
     # 1. 결측치 처리
     df = fill_missing_values(df)
@@ -59,6 +101,7 @@ def main():
     score_columns = {}
 
     for indicator in INDICATORS:
+
         # 2. 이상치 완화
         clipped = clip_outliers(df[indicator])
 
@@ -116,11 +159,11 @@ def main():
         "normalizedData": normalized_data,
     }
 
-    with open(OUTPUT_PATH, "w", encoding="utf-8") as file:
+    with open(output_path, "w", encoding="utf-8") as file:
         json.dump(result, file, ensure_ascii=False, indent=2)
 
-    print(f"✅ 전처리 완료: {OUTPUT_PATH}")
-    print(f"✅ 국가 수: {len(normalized_data)}")
+    logging.info(f"✅ 전처리 완료: {output_path}")
+    logging.info(f"✅ 국가 수: {len(normalized_data)}")
 
 
 if __name__ == "__main__":
