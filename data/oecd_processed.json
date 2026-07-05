@@ -1,0 +1,109 @@
+{
+  "metadata": {
+    "source": "OECD Better Life Index",
+    "method": "Box-Cox transform + Z-Score normalization",
+    "scoreScale": "zScore * 18 + 50, clipped to 0-100",
+    "countryCount": 4
+  },
+  "statistics": {
+    "income": {
+      "lambda": 0.5,
+      "mean": 3.5591,
+      "stdDev": 0.3098
+    },
+    "jobs": {
+      "lambda": 1.0,
+      "mean": 6.975,
+      "stdDev": 0.3631
+    },
+    "health": {
+      "lambda": -0.5,
+      "mean": 1.3496,
+      "stdDev": 0.0175
+    },
+    "lifeSatisfaction": {
+      "lambda": 1.0,
+      "mean": 6.4,
+      "stdDev": 0.5523
+    },
+    "safety": {
+      "lambda": 0.0,
+      "mean": 2.2521,
+      "stdDev": 0.0952
+    }
+  },
+  "normalizedData": [
+    {
+      "country": "한국",
+      "countryCode": "KOR",
+      "rawValues": {
+        "income": 5.8,
+        "jobs": 6.4,
+        "health": 8.8,
+        "lifeSatisfaction": 5.8,
+        "safety": 8.8
+      },
+      "scores": {
+        "income": 30.03,
+        "jobs": 21.5,
+        "health": 61.85,
+        "lifeSatisfaction": 30.45,
+        "safety": 55.73
+      }
+    },
+    {
+      "country": "일본",
+      "countryCode": "JPN",
+      "rawValues": {
+        "income": 6.2,
+        "jobs": 7.1,
+        "health": 9.1,
+        "lifeSatisfaction": 5.9,
+        "safety": 9.4
+      },
+      "scores": {
+        "income": 38.81,
+        "jobs": 56.2,
+        "health": 71.69,
+        "lifeSatisfaction": 33.7,
+        "safety": 66.96
+      }
+    },
+    {
+      "country": "미국",
+      "countryCode": "USA",
+      "rawValues": {
+        "income": 8.1,
+        "jobs": 7.0,
+        "health": 7.8,
+        "lifeSatisfaction": 6.9,
+        "safety": 7.1
+      },
+      "scores": {
+        "income": 77.55,
+        "jobs": 51.24,
+        "health": 25.52,
+        "lifeSatisfaction": 66.3,
+        "safety": 19.7
+      }
+    },
+    {
+      "country": "독일",
+      "countryCode": "DEU",
+      "rawValues": {
+        "income": 6.9,
+        "jobs": 7.4,
+        "health": 8.2,
+        "lifeSatisfaction": 7.0,
+        "safety": 8.9
+      },
+      "scores": {
+        "income": 53.62,
+        "jobs": 71.07,
+        "health": 40.76,
+        "lifeSatisfaction": 69.55,
+        "safety": 57.65
+      }
+    }
+  ]
+}
