@@ -4,7 +4,7 @@
     "method": "missing value median imputation + percentile clipping + Box-Cox + Z-Score normalization",
     "scoreScale": "zScore * 18 + 50, clipped to 0-100",
     "countryCount": 4,
-    "createdAt": "2026-07-05T14:40:07"
+    "createdAt": "2026-07-05T14:54:41"
   },
   "statistics": {
     "income": {

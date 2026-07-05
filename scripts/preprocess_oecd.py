@@ -1,17 +1,17 @@
 import argparse
 import json
-import logging
+
+from preprocessing.exporter import export_processed_json
+from preprocessing.transformer import boxcox_transform, to_0_100_score
+from preprocessing.cleaner import clip_outliers, fill_missing_values
+from preprocessing.logger import logger
+from preprocessing.validator import validate_input_data
 from pathlib import Path
 from datetime import datetime
 
 import numpy as np
 import pandas as pd
 from scipy import stats
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(levelname)s | %(message)s"
-)
 
 INDICATORS = ["income", "jobs", "health", "lifeSatisfaction", "safety"]
 
@@ -20,55 +20,6 @@ RAW_PATH = ROOT_DIR / "data" / "raw" / "oecd_bli_raw.csv"
 OUTPUT_PATH = ROOT_DIR / "data" / "oecd_processed.json"
 
 
-def clip_outliers(series: pd.Series) -> pd.Series:
-    """5~95 분위수 기준으로 극단값 완화"""
-    lower = series.quantile(0.05)
-    upper = series.quantile(0.95)
-    return series.clip(lower, upper)
-
-
-def fill_missing_values(df: pd.DataFrame) -> pd.DataFrame:
-    """결측치는 지표별 중앙값으로 보완"""
-    for indicator in INDICATORS:
-        median_value = df[indicator].median()
-        df[indicator] = df[indicator].fillna(median_value)
-    return df
-
-
-def boxcox_transform(series: pd.Series):
-    """
-    Box-Cox 변환 및 lambda 자동 계산.
-    데이터 수가 적을 때 lambda가 과도하게 튀는 것을 방지하기 위해 -2~2 범위로 제한.
-    """
-    values = series.astype(float) + 1
-    transformed, lambda_value = stats.boxcox(values)
-    lambda_value = float(np.clip(lambda_value, -2, 2))
-    if lambda_value == 0:
-        transformed = np.log(values)
-    else:
-        transformed = ((values ** lambda_value) - 1) / lambda_value
-    return transformed, lambda_value
-
-
-def to_0_100_score(z_scores: np.ndarray) -> np.ndarray:
-    """Z-Score를 0~100 점수로 변환"""
-    scores = z_scores * 18 + 50
-    return np.clip(scores, 0, 100)
-
-def validate_input_data(df: pd.DataFrame) -> None:
-    required_columns = ["country", "countryCode", *INDICATORS]
-
-    missing_columns = [col for col in required_columns if col not in df.columns]
-    if missing_columns:
-        raise ValueError(f"필수 컬럼 누락: {missing_columns}")
-
-    for indicator in INDICATORS:
-        if (df[indicator] < 0).any():
-            raise ValueError(f"{indicator} 컬럼에 음수 값이 있습니다.")
-
-        if (df[indicator] > 100).any():
-            raise ValueError(f"{indicator} 컬럼에 비정상적으로 큰 값이 있습니다.")
-          
 def parse_args():
     parser = argparse.ArgumentParser(description="OECD BLI 데이터 전처리")
     parser.add_argument(
@@ -89,7 +40,7 @@ def main():
     input_path = Path(args.input)
     output_path = Path(args.output)
 
-    logging.info(f"입력 파일 로드: {input_path}")
+    logger.info(f"입력 파일 로드: {input_path}")
 
     df = pd.read_csv(input_path)
     validate_input_data(df)
@@ -159,11 +110,8 @@ def main():
         "normalizedData": normalized_data,
     }
 
-    with open(output_path, "w", encoding="utf-8") as file:
-        json.dump(result, file, ensure_ascii=False, indent=2)
-
-    logging.info(f"✅ 전처리 완료: {output_path}")
-    logging.info(f"✅ 국가 수: {len(normalized_data)}")
+    export_processed_json(result, output_path)
+    logger.info(f"국가 수: {len(normalized_data)}")
 
 
 if __name__ == "__main__":
