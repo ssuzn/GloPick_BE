@@ -10,6 +10,13 @@ interface UserWeights {
   safety: number;
 }
 
+interface ProcessedCountryData {
+  country: string;
+  countryCode: string;
+  rawValues: Record<Indicator, number>;
+  scores: Record<Indicator, number>;
+}
+
 class OECDService {
   private readonly indicators: Indicator[] = [
     "income",
@@ -36,35 +43,36 @@ class OECDService {
     Germany: "DEU",
   };
 
-  private findCountry(countryName: string) {
-    const countryCode =
-      this.englishCountryMapping[countryName] || this.countryMapping[countryName];
+  private normalizeCountryName(countryName: string) {
+    return countryName.trim().toLowerCase();
+  }
 
+  private findCountry(countryName: string): ProcessedCountryData | undefined {
+    const normalizedName = this.normalizeCountryName(countryName);
+    
+    const countryCode =
+      this.englishCountryMapping[countryName] ||
+      this.countryMapping[countryName] ||
+      countryName.toUpperCase();
+    
     return processedData.normalizedData.find(
       (item) =>
-        item.country === countryName ||
-        item.countryCode === countryName ||
         item.countryCode === countryCode ||
-        item.country.toLowerCase() === countryName.toLowerCase()
-    );
+        this.normalizeCountryName(item.country) === normalizedName
+    ) as ProcessedCountryData | undefined;
   }
 
   async getCountryBetterLifeData(countryName: string) {
-  const country = this.findCountry(countryName);
-  if (!country) {
-    return null;
-  }
+    const country = this.findCountry(countryName);
 
-  return {
-    country: country.country,
-    countryCode: country.countryCode,
-    income: country.rawValues.income,
-    jobs: country.rawValues.jobs,
-    health: country.rawValues.health,
-    lifeSatisfaction: country.rawValues.lifeSatisfaction,
-    safety: country.rawValues.safety,
-  };
-}
+    if (!country) return null;
+
+    return {
+      country: country.country,
+      countryCode: country.countryCode,
+      ...country.rawValues,
+    };
+  }
 
   async calculateQualityOfLifeScore(
     countryName: string,
@@ -72,9 +80,7 @@ class OECDService {
   ): Promise<number> {
     const country = this.findCountry(countryName);
 
-    if (!country) {
-      return 50;
-    }
+    if (!country) return 50;
 
     const finalScore =
       this.indicators.reduce((sum, key) => {
@@ -84,20 +90,10 @@ class OECDService {
     return Math.round(Math.max(0, finalScore) * 100) / 100;
   }
 
-  getProcessedMetadata() {
-    return processedData.metadata;
-  }
-
-  getProcessedStatistics() {
-    return processedData.statistics;
-  }
-
   getCountryScores(countryName: string) {
     const country = this.findCountry(countryName);
 
-    if (!country) {
-      return null;
-    }
+    if (!country) return null;
 
     return {
       country: country.country,
@@ -105,6 +101,14 @@ class OECDService {
       rawValues: country.rawValues,
       scores: country.scores,
     };
+  }
+
+  getPipelineMetadata() {
+    return processedData.metadata;
+  }
+
+  getStatistics() {
+    return processedData.statistics;
   }
 }
 

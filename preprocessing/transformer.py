@@ -21,3 +21,16 @@ def to_0_100_score(z_scores: np.ndarray) -> np.ndarray:
     """Z-Score를 0~100 점수로 변환"""
     scores = z_scores * 18 + 50
     return np.clip(scores, 0, 100)
+
+def calculate_statistics(series: pd.Series) -> dict:
+    return {
+        "mean": round(series.mean(), 4),
+        "median": round(series.median(), 4),
+        "stdDev": round(series.std(), 4),
+        "variance": round(series.var(), 4),
+        "min": round(series.min(), 4),
+        "q1": round(series.quantile(0.25), 4),
+        "q3": round(series.quantile(0.75), 4),
+        "iqr": round(series.quantile(0.75) - series.quantile(0.25), 4),
+        "max": round(series.max(), 4),
+    }

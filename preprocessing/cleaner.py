@@ -15,3 +15,25 @@ def fill_missing_values(df: pd.DataFrame) -> pd.DataFrame:
         median_value = df[indicator].median()
         df[indicator] = df[indicator].fillna(median_value)
     return df
+  
+def convert_long_to_wide(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Long Format:
+    country,countryCode,indicator,value
+    ↓
+    Wide Format:
+    country,countryCode,income,jobs,...
+    """
+
+    required = {"country", "countryCode", "indicator", "value"}
+    if not required.issubset(df.columns):
+        return df
+    df = (
+        df.pivot(
+            index=["country", "countryCode"],
+            columns="indicator",
+            values="value",
+        )
+        .reset_index()
+    )
+    return df

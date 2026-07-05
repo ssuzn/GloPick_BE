@@ -1,11 +1,15 @@
 import argparse
-import json
 
 from preprocessing.exporter import export_processed_json
-from preprocessing.transformer import boxcox_transform, to_0_100_score
-from preprocessing.cleaner import clip_outliers, fill_missing_values
+from preprocessing.transformer import boxcox_transform, calculate_statistics, to_0_100_score
+from preprocessing.cleaner import (
+    convert_long_to_wide,
+    fill_missing_values,
+    clip_outliers,
+)
 from preprocessing.logger import logger
 from preprocessing.validator import validate_input_data
+from preprocessing.visualizer import save_distribution_plots
 from pathlib import Path
 from datetime import datetime
 
@@ -43,6 +47,8 @@ def main():
     logger.info(f"입력 파일 로드: {input_path}")
 
     df = pd.read_csv(input_path)
+    df = convert_long_to_wide(df)
+    logger.info("데이터 형식 변환 완료")
     validate_input_data(df)
 
     # 1. 결측치 처리
@@ -73,13 +79,8 @@ def main():
 
         score_columns[indicator] = np.round(scores, 2)
 
-        statistics_result[indicator] = {
-            "lambda": round(lambda_value, 4),
-            "mean": round(mean_value, 4),
-            "stdDev": round(std_value, 4),
-            "min": round(float(clipped.min()), 4),
-            "max": round(float(clipped.max()), 4),
-        }
+        statistics_result[indicator] = calculate_statistics(transformed)
+        statistics_result[indicator]["lambda"] = round(lambda_value, 4)
 
     normalized_data = []
 
@@ -110,6 +111,10 @@ def main():
         "normalizedData": normalized_data,
     }
 
+    score_df = pd.DataFrame(score_columns)
+    plot_dir = ROOT_DIR / "data" / "plots"
+    save_distribution_plots(df, score_df, plot_dir)
+    
     export_processed_json(result, output_path)
     logger.info(f"국가 수: {len(normalized_data)}")
 
