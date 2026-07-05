@@ -21,9 +21,16 @@
 - Box-Cox Transformation
 - Z-Score Normalization
 
-### 🔐 Authentication
+### 🔐 Authentication & Persistence
 - JWT 기반 로그인
-- 추천 결과 저장 및 조회
+- PostgreSQL + Prisma 기반 데이터 관리
+- 추천 결과 및 시뮬레이션 저장/조회
+
+### 🗄️ Database
+- MongoDB → PostgreSQL 마이그레이션
+- Prisma ORM 적용
+- 타입 안전성과 관계형 데이터 모델링 개선
+- Docker 기반 개발 환경 구축
 
 ## 🏗️ Architecture
 
@@ -31,27 +38,42 @@
                   OECD / World Bank / ILOSTAT
                               │
                               ▼
-                    Python ETL Pipeline
-      Validation → Cleaning → Box-Cox → Z-Score
+                      Python ETL Pipeline
+          Validation → Cleaning → Box-Cox → Z-Score
                               │
                               ▼
-                  oecd_processed.json
+                      oecd_processed.json
                               │
                               ▼
-                    Node.js Recommendation API
+                  Express Recommendation API
                               │
+            ┌─────────────────┴─────────────────┐
+            ▼                                   ▼
+      OpenAI API                    PostgreSQL + Prisma
+            │                                   │
+            └─────────────────┬─────────────────┘
                               ▼
                      React Frontend (Vite)
 ```
 
+## 🗄️ Database ERD
+<p align="center">
+  <img width="1952" height="1830" alt="Untitled" src="https://github.com/user-attachments/assets/33a888cf-57a3-4b35-ade0-b90999fcfd5b" />
+</p>
+
+### Relationship
+- User 1:N UserProfile
+- UserProfile 1:N CountryRecommendationResult
+- UserProfile 1:N SimulationInput
+- CountryRecommendationResult 1:N CountryRecommendationItem
+- SimulationInput 1:1 SimulationResult
 
 ## ⚙️ Tech Stack
-
-
 | Category | Technologies |
 |----------|--------------|
 | 🎨 Frontend | React · TypeScript · Zustand · Axios · Tailwind CSS |
 | ⚙️ Backend | Node.js · Express · TypeScript |
+| 🗄️ Database | PostgreSQL · Prisma ORM |
 | 📈 Data | Python · Pandas · NumPy · SciPy · Matplotlib |
 | 🤖 AI | OpenAI API |
 | 🌍 Data Source | OECD Better Life Index · World Bank · ILOSTAT |
@@ -113,15 +135,16 @@ src/
  ├── controllers
  ├── services
  ├── routes
+ ├── middlewares
+ ├── db.ts
  └── ...
 
-preprocessing/
- ├── validator.py
- ├── cleaner.py
- ├── transformer.py
- ├── exporter.py
- └── visualizer.py
+prisma/
+ ├── schema.prisma
+ ├── migrations
+ └── seed.ts
 
+preprocessing/
 tests/
 scripts/
 data/
@@ -135,13 +158,23 @@ data/
 npm install
 ```
 
-### 2. Create Python Virtual Environment
+### 2. Run PostgreSQL
+```bash
+docker compose up -d
+```
+
+### 3. Apply Prisma Migration
+```bash
+npx prisma migrate dev
+```
+
+### 4. Create Python Virtual Environment
 
 ```bash
 python -m venv .venv
 ```
 
-### 3. Activate Virtual Environment
+### 5. Activate Virtual Environment
 macOS / Linux
 ```bash
 source .venv/bin/activate
@@ -153,36 +186,29 @@ Windows
 .venv\Scripts\activate
 ```
 
-### 4. Install Python Packages
+### 6. Install Python Packages
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 5. Run ETL
+### 7. Run ETL
 
 ```bash
 npm run preprocess:oecd
 ```
 
-### 6. Run Backend
+### 8. Start Backend
 
 ```bash
 npm run dev
 ```
 
-### 7. Run Tests
-
-Python
-
-```bash
-npm run test:python
-```
-
-Backend
+### 9. Run Tests
 
 ```bash
 npm run build
+npm run test:python
 ```
 
 ## 📈 Data Sources
@@ -191,5 +217,6 @@ npm run build
 - OECD Better Life Index
 - World Bank
 - ILOSTAT
+- REST Countries API
 - OpenAI API
 ```
