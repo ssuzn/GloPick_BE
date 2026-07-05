@@ -1,35 +1,46 @@
 {
   "metadata": {
     "source": "OECD Better Life Index",
-    "method": "Box-Cox transform + Z-Score normalization",
+    "method": "missing value median imputation + percentile clipping + Box-Cox + Z-Score normalization",
     "scoreScale": "zScore * 18 + 50, clipped to 0-100",
-    "countryCount": 4
+    "countryCount": 4,
+    "createdAt": "2026-07-05T14:30:19"
   },
   "statistics": {
     "income": {
-      "lambda": 0.5,
-      "mean": 3.5591,
-      "stdDev": 0.3098
+      "lambda": -2.0,
+      "mean": 0.4914,
+      "stdDev": 0.0017,
+      "min": 5.86,
+      "max": 7.92
     },
     "jobs": {
-      "lambda": 1.0,
-      "mean": 6.975,
-      "stdDev": 0.3631
+      "lambda": 2.0,
+      "mean": 31.4395,
+      "stdDev": 2.4831,
+      "min": 6.49,
+      "max": 7.355
     },
     "health": {
-      "lambda": -0.5,
-      "mean": 1.3496,
-      "stdDev": 0.0175
+      "lambda": 1.9741,
+      "mean": 42.5367,
+      "stdDev": 4.2244,
+      "min": 7.86,
+      "max": 9.055
     },
     "lifeSatisfaction": {
-      "lambda": 1.0,
-      "mean": 6.4,
-      "stdDev": 0.5523
+      "lambda": 0.0526,
+      "mean": 2.1078,
+      "stdDev": 0.0818,
+      "min": 5.815,
+      "max": 6.985
     },
     "safety": {
-      "lambda": 0.0,
-      "mean": 2.2521,
-      "stdDev": 0.0952
+      "lambda": 2.0,
+      "mean": 45.8077,
+      "stdDev": 6.8776,
+      "min": 7.355,
+      "max": 9.325
     }
   },
   "normalizedData": [
@@ -44,11 +55,11 @@
         "safety": 8.8
       },
       "scores": {
-        "income": 30.03,
-        "jobs": 21.5,
-        "health": 61.85,
-        "lifeSatisfaction": 30.45,
-        "safety": 55.73
+        "income": 28.37,
+        "jobs": 21.81,
+        "health": 62.01,
+        "lifeSatisfaction": 30.55,
+        "safety": 54.48
       }
     },
     {
@@ -62,11 +73,11 @@
         "safety": 9.4
       },
       "scores": {
-        "income": 38.81,
-        "jobs": 56.2,
-        "health": 71.69,
-        "lifeSatisfaction": 33.7,
-        "safety": 66.96
+        "income": 39.05,
+        "jobs": 56.27,
+        "health": 72.17,
+        "lifeSatisfaction": 33.56,
+        "safety": 68.31
       }
     },
     {
@@ -80,11 +91,11 @@
         "safety": 7.1
       },
       "scores": {
-        "income": 77.55,
-        "jobs": 51.24,
-        "health": 25.52,
-        "lifeSatisfaction": 66.3,
-        "safety": 19.7
+        "income": 75.71,
+        "jobs": 50.44,
+        "health": 26.73,
+        "lifeSatisfaction": 66.63,
+        "safety": 20.15
       }
     },
     {
@@ -98,11 +109,11 @@
         "safety": 8.9
       },
       "scores": {
-        "income": 53.62,
-        "jobs": 71.07,
-        "health": 40.76,
-        "lifeSatisfaction": 69.55,
-        "safety": 57.65
+        "income": 56.87,
+        "jobs": 71.48,
+        "health": 39.09,
+        "lifeSatisfaction": 69.26,
+        "safety": 57.06
       }
     }
   ]

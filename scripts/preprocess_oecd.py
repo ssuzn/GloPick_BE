@@ -1,98 +1,118 @@
 import json
-import math
 from pathlib import Path
-from statistics import mean, pstdev
+from datetime import datetime
+
+import numpy as np
+import pandas as pd
+from scipy import stats
 
 INDICATORS = ["income", "jobs", "health", "lifeSatisfaction", "safety"]
 
-# 일단 기존 TS 코드의 lambda를 사용
-# 나중에 scipy를 설치하면 최적 lambda 자동 산출 버전으로 개선 가능
-BOX_COX_LAMBDAS = {
-    "income": 0.5,
-    "jobs": 1.0,
-    "health": -0.5,
-    "lifeSatisfaction": 1.0,
-    "safety": 0.0,
-}
-
 ROOT_DIR = Path(__file__).resolve().parents[1]
-RAW_PATH = ROOT_DIR / "data" / "oecd_raw.json"
+RAW_PATH = ROOT_DIR / "data" / "raw" / "oecd_bli_raw.csv"
 OUTPUT_PATH = ROOT_DIR / "data" / "oecd_processed.json"
 
 
-def box_cox_transform(value: float, lambda_value: float) -> float:
-    value = value + 1
+def clip_outliers(series: pd.Series) -> pd.Series:
+    """5~95 분위수 기준으로 극단값 완화"""
+    lower = series.quantile(0.05)
+    upper = series.quantile(0.95)
+    return series.clip(lower, upper)
 
+
+def fill_missing_values(df: pd.DataFrame) -> pd.DataFrame:
+    """결측치는 지표별 중앙값으로 보완"""
+    for indicator in INDICATORS:
+        median_value = df[indicator].median()
+        df[indicator] = df[indicator].fillna(median_value)
+    return df
+
+
+def boxcox_transform(series: pd.Series):
+    """
+    Box-Cox 변환 및 lambda 자동 계산.
+    데이터 수가 적을 때 lambda가 과도하게 튀는 것을 방지하기 위해 -2~2 범위로 제한.
+    """
+    values = series.astype(float) + 1
+    transformed, lambda_value = stats.boxcox(values)
+    lambda_value = float(np.clip(lambda_value, -2, 2))
     if lambda_value == 0:
-        return math.log(value)
+        transformed = np.log(values)
+    else:
+        transformed = ((values ** lambda_value) - 1) / lambda_value
+    return transformed, lambda_value
 
-    return (math.pow(value, lambda_value) - 1) / lambda_value
 
-
-def to_score(value: float, lambda_value: float, avg: float, std_dev: float) -> float:
-    if std_dev == 0:
-        return 50.0
-
-    transformed = box_cox_transform(value, lambda_value)
-    z_score = (transformed - avg) / std_dev
-    score = z_score * 18 + 50
-
-    return round(max(0, min(100, score)), 2)
+def to_0_100_score(z_scores: np.ndarray) -> np.ndarray:
+    """Z-Score를 0~100 점수로 변환"""
+    scores = z_scores * 18 + 50
+    return np.clip(scores, 0, 100)
 
 
 def main():
-    with open(RAW_PATH, "r", encoding="utf-8") as file:
-        raw_data = json.load(file)
+    df = pd.read_csv(RAW_PATH)
 
-    statistics = {}
+    # 1. 결측치 처리
+    df = fill_missing_values(df)
+
+    statistics_result = {}
+    score_columns = {}
 
     for indicator in INDICATORS:
-        transformed_values = [
-            box_cox_transform(row[indicator], BOX_COX_LAMBDAS[indicator])
-            for row in raw_data
-            if row.get(indicator) is not None
-        ]
+        # 2. 이상치 완화
+        clipped = clip_outliers(df[indicator])
 
-        statistics[indicator] = {
-            "lambda": BOX_COX_LAMBDAS[indicator],
-            "mean": round(mean(transformed_values), 4),
-            "stdDev": round(pstdev(transformed_values), 4),
+        # 3. Box-Cox 변환 + lambda 자동 산출
+        transformed, lambda_value = boxcox_transform(clipped)
+
+        # 4. Z-Score 계산
+        mean_value = float(np.mean(transformed))
+        std_value = float(np.std(transformed))
+
+        if std_value == 0:
+            z_scores = np.zeros_like(transformed)
+        else:
+            z_scores = (transformed - mean_value) / std_value
+
+        # 5. 0~100 점수 변환
+        scores = to_0_100_score(z_scores)
+
+        score_columns[indicator] = np.round(scores, 2)
+
+        statistics_result[indicator] = {
+            "lambda": round(lambda_value, 4),
+            "mean": round(mean_value, 4),
+            "stdDev": round(std_value, 4),
+            "min": round(float(clipped.min()), 4),
+            "max": round(float(clipped.max()), 4),
         }
 
     normalized_data = []
 
-    for row in raw_data:
-        scores = {}
-
-        for indicator in INDICATORS:
-            stat = statistics[indicator]
-
-            scores[indicator] = to_score(
-                value=row[indicator],
-                lambda_value=stat["lambda"],
-                avg=stat["mean"],
-                std_dev=stat["stdDev"],
-            )
-
+    for index, row in df.iterrows():
         normalized_data.append(
             {
                 "country": row["country"],
                 "countryCode": row["countryCode"],
                 "rawValues": {
-                    indicator: row[indicator] for indicator in INDICATORS
+                    indicator: float(row[indicator]) for indicator in INDICATORS
                 },
-                "scores": scores,
+                "scores": {
+                    indicator: float(score_columns[indicator][index])
+                    for indicator in INDICATORS
+                },
             }
         )
 
     result = {
         "metadata": {
             "source": "OECD Better Life Index",
-            "method": "Box-Cox transform + Z-Score normalization",
+            "method": "missing value median imputation + percentile clipping + Box-Cox + Z-Score normalization",
             "scoreScale": "zScore * 18 + 50, clipped to 0-100",
             "countryCount": len(normalized_data),
+            "createdAt": datetime.now().isoformat(timespec="seconds"),
         },
-        "statistics": statistics,
+        "statistics": statistics_result,
         "normalizedData": normalized_data,
     }
 
