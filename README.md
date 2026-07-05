@@ -1,119 +1,195 @@
-# GloPick_BE
- # 🚀 Git Convention
+# 🌍 GloPick
 
-팀 협업을 원활하게 진행하기 위해 Git 컨벤션을 아래와 같이 정합니다.
+> **AI 기반 해외 이주 · 취업 국가 추천 플랫폼**
 
-## 📌 브랜치 전략
+사용자의 직무, 언어 능력, 삶의 질 선호도를 기반으로
+해외 취업 및 이주에 적합한 국가를 추천하는 서비스입니다.
 
-### 브랜치 생성 규칙
+단순 LLM 추천이 아닌 **OECD, World Bank, ILOSTAT 공공데이터**를 활용하여
+추천 결과의 신뢰성과 일관성을 높였습니다.
 
-- `main` : 최종 배포 브랜치
-- `develop` : 개발 브랜치 (기능 구현 완료 후 머지)
-- `feat/#이슈번호` : 새로운 기능 개발을 위한 브랜치
-- `fix/#이슈번호` : 버그 수정 브랜치
-- `hotfix/#이슈번호` : 프로덕션(배포)에서 발생한 긴급 수정
+## ✨ Features
 
----
+### 🤖 AI Recommendation
+- GPT 기반 국가 및 도시 추천
+- 사용자 가중치 기반 개인화 추천
+- 추천 근거 및 점수 제공
 
-## 📌 커밋 메시지 규칙
+### 📊 Data Processing
+- Python ETL Pipeline 구축
+- OECD · World Bank · ILOSTAT 데이터 통합
+- Box-Cox Transformation
+- Z-Score Normalization
 
-```
-Type: Subject (#이슈번호)
-예시: feat: 로그인 기능 추가 (#12)
-```
+### 🔐 Authentication
+- JWT 기반 로그인
+- 추천 결과 저장 및 조회
 
-- **`Type`**: 커밋의 목적을 나타내는 태그 (예: `feat`, `fix`, `docs` 등)
-- **`Subject`**: 변경 사항에 대한 간결한 설명을 작성
-- **`#이슈번호`**: 관련 이슈 번호를 포함
+## 🏗️ Architecture
 
-### 커밋 메시지 타입
-
-| 타입 | 설명 |
-| --- | --- |
-| feat | 새로운 기능 추가 |
-| fix | 버그 수정 |
-| docs | 문서 수정 (README 등) |
-| style | 코드 스타일 변경 (세미콜론 추가 등 기능 변경 없음) |
-| refactor | 코드 리팩토링 (기능 변경 없음) |
-| test | 테스트 코드 추가 |
-| chore | 기타 작업 (빌드 설정 변경, 패키지 설치 등) |
-
----
-
-## 📌 이슈 관리 규칙
-
-### 이슈 제목 규칙
-
-```
-[태그] 이슈 제목
-예시: [feat] 카카오 로그인 구현
+```text
+                  OECD / World Bank / ILOSTAT
+                              │
+                              ▼
+                    Python ETL Pipeline
+      Validation → Cleaning → Box-Cox → Z-Score
+                              │
+                              ▼
+                  oecd_processed.json
+                              │
+                              ▼
+                    Node.js Recommendation API
+                              │
+                              ▼
+                     React Frontend (Vite)
 ```
 
-- **[feat]** 새로운 기능 개발
-- **[fix]** 버그 수정
-- **[docs]** 문서 수정
-- **[refactor]** 리팩토링
-- **[test]** 테스트 코드 추가
-- **[chore]** 기타
 
-### 이슈 본문 템플릿
+## ⚙️ Tech Stack
 
+
+| Category | Technologies |
+|----------|--------------|
+| 🎨 Frontend | React · TypeScript · Zustand · Axios · Tailwind CSS |
+| ⚙️ Backend | Node.js · Express · TypeScript |
+| 📈 Data | Python · Pandas · NumPy · SciPy · Matplotlib |
+| 🤖 AI | OpenAI API |
+| 🌍 Data Source | OECD Better Life Index · World Bank · ILOSTAT |
+
+
+## 📊 Python ETL Pipeline
+
+공공데이터를 서비스에서 활용하기 위해
+Python 기반 ETL 파이프라인을 구축하여
+데이터 검증부터 정규화, 시각화를 자동화했습니다.
+
+#### Pipeline
+
+```text
+Raw CSV
+   │
+   ▼
+Validation
+   │
+   ▼
+Missing Value Imputation
+   │
+   ▼
+Percentile Clipping
+   │
+   ▼
+Box-Cox Transformation
+   │
+   ▼
+Z-Score Normalization
+   │
+   ▼
+0~100 Score Scaling
+   │
+   ▼
+Visualization
+   │
+   ▼
+JSON Export
 ```
-## 📄 작업 대상
- - 카카오 로그인 구현
 
-## ✅ 작업 내용
-  - [x] To do
-  - [ ] To do
+#### Processing Features
 
-## 💬 리뷰 요구사항
+- 데이터 검증(Validation)
+- 결측치 중앙값 대체(Median Imputation)
+- 이상치 완화(Percentile Clipping)
+- Box-Cox 변환
+- Z-Score 표준화
+- 0~100 점수 변환
+- 통계 정보 자동 생성
+- 분포 시각화 자동 생성
+- pytest 기반 단위 테스트
 
-## 📎 기타 참고 사항
-  - 관련 API 문서: http://localhost:5001/api-docs/
 
+## 📂 Project Structure
+
+```text
+src/
+ ├── controllers
+ ├── services
+ ├── routes
+ └── ...
+
+preprocessing/
+ ├── validator.py
+ ├── cleaner.py
+ ├── transformer.py
+ ├── exporter.py
+ └── visualizer.py
+
+tests/
+scripts/
+data/
 ```
 
----
+## 🚀 Getting Started
 
-## 📌 PR(Pull Request) 규칙
+### 1. Install Node Packages
 
-### PR 제목 규칙
-
-```
-[태그] 작업 내용 (#이슈번호)
-예시: [feat] 회원가입 API 연동 (#15)
+```bash
+npm install
 ```
 
-### PR 본문 템플릿
+### 2. Create Python Virtual Environment
 
-```
-## 📌 개요
-- 회원가입 API 연동
-
-## 🗒️ 작업 내용 요약
-- Redux를 활용한 상태 관리 추가
-- Axios를 이용한 API 호출
-
-## 🔗 관련 이슈
-- Closes #15
-
+```bash
+python -m venv .venv
 ```
 
-### PR 머지 규칙
+### 3. Activate Virtual Environment
+macOS / Linux
+```bash
+source .venv/bin/activate
+```
 
-- 최소 1명 이상 코드 리뷰 후 승인
-- develop 브랜치에 머지 (배포 전 main 브랜치로 병합)
+Windows
 
----
+```bash
+.venv\Scripts\activate
+```
 
-## 📌 기타 규칙
+### 4. Install Python Packages
 
-### 코드 스타일
+```bash
+pip install -r requirements.txt
+```
 
-- 함수 및 변수 네이밍: camelCase 사용
-- React 컴포넌트 네이밍: PascalCase 사용 (예: LoginForm.js)
+### 5. Run ETL
 
-### 커밋 & 브랜치 주의사항
+```bash
+npm run preprocess:oecd
+```
 
-- 작업 단위별 커밋 (기능이 완성되면 커밋)
-- 작업 완료 후 PR 작성, 코드 리뷰 요청
+### 6. Run Backend
+
+```bash
+npm run dev
+```
+
+### 7. Run Tests
+
+Python
+
+```bash
+npm run test:python
+```
+
+Backend
+
+```bash
+npm run build
+```
+
+## 📈 Data Sources
+
+```md
+- OECD Better Life Index
+- World Bank
+- ILOSTAT
+- OpenAI API
+```
