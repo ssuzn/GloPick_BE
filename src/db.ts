@@ -1,17 +1,19 @@
-import mongoose from "mongoose";
-import dotenv from "dotenv";
+import "dotenv/config";
+import { PrismaClient } from "./generated/prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
 
-dotenv.config();
+const adapter = new PrismaPg({
+  connectionString: process.env.DATABASE_URL!,
+});
 
-const MONGO_URI = process.env.MONGO_URI || "";
+export const prisma = new PrismaClient({ adapter });
+
 export const connectDB = async () => {
   try {
-    await mongoose.connect(MONGO_URI, {
-      dbName: "GloPickDB",
-    });
-    console.log("MongoDB Atlas 연결 테스트");
+    await prisma.$connect();
+    console.log("PostgreSQL 연결 성공");
   } catch (error) {
-    console.error(" MongoDB 연결 실패:", error);
+    console.error("PostgreSQL 연결 실패:", error);
     process.exit(1);
   }
 };

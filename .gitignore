@@ -20,3 +20,5 @@ yarn-error.log*
 
 # TypeScript 컴파일 정보
 *.tsbuildinfo
+
+/src/generated/prisma

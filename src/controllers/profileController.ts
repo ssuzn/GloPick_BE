@@ -1,25 +1,32 @@
 import { Request, Response } from "express";
-import UserProfile from "../models/UserProfile";
+import { prisma } from "../db";
 import { AuthRequest } from "../middlewares/authMiddleware";
-import { Types } from "mongoose";
 import {
   JOB_FIELDS,
   SUPPORTED_LANGUAGES,
   QUALITY_OF_LIFE_INDICATORS,
 } from "../constants/dropdownOptions";
+import { DesiredJob, Language } from "../generated/prisma/client";
+
+const toDesiredJobEnum = (desiredJob: string): DesiredJob => {
+  return `JOB_${desiredJob}` as DesiredJob;
+};
+
+const toLanguageEnum = (language: string): Language => {
+  return language as Language;
+};
 
 // 사용자 이력 등록 (POST /api/profile)
 export const createProfile = async (req: AuthRequest, res: Response) => {
   const {
     language,
     desiredJob,
-    qualityOfLifeWeights, // OECD Better Life Index 5가지 가중치
+    qualityOfLifeWeights,
     languageWeight,
     jobWeight,
     qualityOfLifeWeight,
   } = req.body;
 
-  // OECD Better Life Index 가중치 검증
   if (!qualityOfLifeWeights) {
     return res.status(400).json({
       code: 400,
@@ -30,7 +37,6 @@ export const createProfile = async (req: AuthRequest, res: Response) => {
     });
   }
 
-  // 사용자가 입력한 가중치를 그대로 사용
   const finalQualityWeights = {
     income: qualityOfLifeWeights.income ?? 0,
     jobs: qualityOfLifeWeights.jobs ?? 0,
@@ -39,11 +45,11 @@ export const createProfile = async (req: AuthRequest, res: Response) => {
     safety: qualityOfLifeWeights.safety ?? 0,
   };
 
-  // 삶의 질 가중치 검증 (합계 100)
   const qualityTotal = Object.values(finalQualityWeights).reduce(
     (sum, val) => sum + val,
     0
   );
+
   if (qualityTotal !== 100) {
     return res.status(400).json({
       code: 400,
@@ -55,7 +61,6 @@ export const createProfile = async (req: AuthRequest, res: Response) => {
     });
   }
 
-  // 전체 추천 가중치 검증
   if (
     typeof languageWeight !== "number" ||
     typeof jobWeight !== "number" ||
@@ -76,8 +81,8 @@ export const createProfile = async (req: AuthRequest, res: Response) => {
     qualityOfLifeWeight,
   };
 
-  // 전체 가중치 검증 (직무 + 언어 + QOL = 100)
   const totalWeight = languageWeight + jobWeight + qualityOfLifeWeight;
+
   if (totalWeight !== 100) {
     return res.status(400).json({
       code: 400,
@@ -89,26 +94,27 @@ export const createProfile = async (req: AuthRequest, res: Response) => {
     });
   }
 
-  // 이전 이력과 동일한 내용이면 등록 불가
-  const normalize = (value: string) => (value || "").trim().toLowerCase();
+  const prismaDesiredJob = toDesiredJobEnum(desiredJob);
+  const prismaLanguage = toLanguageEnum(language);
 
-  const existingProfiles = await UserProfile.find({ user: req.user!._id });
+  const existingProfiles = await prisma.userProfile.findMany({
+    where: {
+      userId: req.user!.id,
+    },
+  });
 
   const isDuplicate = existingProfiles.find((profile) => {
     return (
-      profile.language === language &&
-      profile.desiredJob === desiredJob &&
-      // 삶의 질 가중치 비교
-      profile.qualityOfLifeWeights?.income === finalQualityWeights.income &&
-      profile.qualityOfLifeWeights?.jobs === finalQualityWeights.jobs &&
-      profile.qualityOfLifeWeights?.health === finalQualityWeights.health &&
-      profile.qualityOfLifeWeights?.lifeSatisfaction ===
-        finalQualityWeights.lifeSatisfaction &&
-      profile.qualityOfLifeWeights?.safety === finalQualityWeights.safety &&
-      // 전체 가중치 비교
-      profile.weights?.languageWeight === finalWeights.languageWeight &&
-      profile.weights?.jobWeight === finalWeights.jobWeight &&
-      profile.weights?.qualityOfLifeWeight === finalWeights.qualityOfLifeWeight
+      profile.language === prismaLanguage &&
+      profile.desiredJob === prismaDesiredJob &&
+      profile.incomeWeight === finalQualityWeights.income &&
+      profile.jobsWeight === finalQualityWeights.jobs &&
+      profile.healthWeight === finalQualityWeights.health &&
+      profile.lifeSatisfactionWeight === finalQualityWeights.lifeSatisfaction &&
+      profile.safetyWeight === finalQualityWeights.safety &&
+      profile.languageWeight === finalWeights.languageWeight &&
+      profile.jobWeight === finalWeights.jobWeight &&
+      profile.qualityOfLifeWeight === finalWeights.qualityOfLifeWeight
     );
   });
 
@@ -117,24 +123,34 @@ export const createProfile = async (req: AuthRequest, res: Response) => {
       code: 400,
       message: "이전 이력과 내용이 동일합니다. 등록이 불가합니다.",
       data: {
-        profileId: isDuplicate._id,
+        profileId: isDuplicate.id,
       },
     });
   }
 
-  const profile = await UserProfile.create({
-    user: req.user!._id,
-    language,
-    desiredJob,
-    qualityOfLifeWeights: finalQualityWeights, // OECD 가중치 저장
-    weights: finalWeights, // 전체 추천 가중치 저장
+  const profile = await prisma.userProfile.create({
+    data: {
+      userId: req.user!.id,
+      language: prismaLanguage,
+      desiredJob: prismaDesiredJob,
+
+      incomeWeight: finalQualityWeights.income,
+      jobsWeight: finalQualityWeights.jobs,
+      healthWeight: finalQualityWeights.health,
+      lifeSatisfactionWeight: finalQualityWeights.lifeSatisfaction,
+      safetyWeight: finalQualityWeights.safety,
+
+      languageWeight: finalWeights.languageWeight,
+      jobWeight: finalWeights.jobWeight,
+      qualityOfLifeWeight: finalWeights.qualityOfLifeWeight,
+    },
   });
 
   res.status(201).json({
     code: 201,
     message: "이력과 가중치가 정상적으로 등록되었습니다.",
     data: {
-      profileId: profile._id,
+      profileId: profile.id,
     },
   });
 };
