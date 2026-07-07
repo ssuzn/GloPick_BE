@@ -25,7 +25,7 @@ const formatProfile = (profile: any) => ({
 });
 
 const formatSimulationResult = (sim: any) => ({
-  _id: sim.id,
+  id: sim.id,
   input: sim.input
     ? {
         inputId: sim.input.id,
@@ -81,7 +81,7 @@ const formatSimulationResult = (sim: any) => ({
 });
 
 const formatRecommendationResult = (rec: any) => ({
-  _id: rec.id,
+  id: rec.id,
   profile: rec.profile ? formatProfile(rec.profile) : null,
   recommendations: rec.recommendations.map((country: any) => ({
     country: country.country,

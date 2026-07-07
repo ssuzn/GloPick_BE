@@ -7,6 +7,11 @@ import {
   getDesiredJobName,
 } from "./simulationService";
 
+type CityRecommendation = {
+  name: string;
+  summary: string;
+};
+
 export const createCityRecommendations = async ({
   userId,
   recommendationId,
@@ -21,7 +26,7 @@ export const createCityRecommendations = async ({
   const recommendation = await findRecommendationWithItems(
     recommendationId,
     userId,
-    profileId
+    profileId,
   );
 
   if (!recommendation) {
@@ -55,7 +60,7 @@ export const createCityRecommendations = async ({
   const existingInput = await findLatestSimulationInputByCountry(
     userId,
     profileId,
-    selectedCountry
+    selectedCountry,
   );
 
   if (existingInput) {
@@ -90,17 +95,17 @@ export const createCityRecommendations = async ({
   const userJob = getDesiredJobName(profile.desiredJob);
   const userLanguage = profile.language;
 
-  const cityRecommendations = await getSimpleCityRecommendations(
+  const cityRecommendations = (await getSimpleCityRecommendations(
     selectedCountry,
     userJob || undefined,
-    userLanguage || undefined
-  );
+    userLanguage || undefined,
+  )) as CityRecommendation[];
 
   const newInput = await createCityRecommendationInput(
     userId,
     profileId,
     selectedCountry,
-    cityRecommendations.map((city: any) => city.name)
+    cityRecommendations.map((city) => city.name),
   );
 
   return {

@@ -9,7 +9,10 @@ import {
   saveSimulation,
 } from "../services/simulationService";
 import { createCityRecommendations } from "../services/cityRecommendationService";
-import { RecommendCitiesRequestDto, SaveSimulationRequestDto } from "../dto/simulation.dto";
+import {
+  RecommendCitiesRequestDto,
+  SaveSimulationRequestDto,
+} from "../dto/simulation.dto";
 
 export const saveSimulationInput = async (req: AuthRequest, res: Response) => {
   try {
@@ -216,7 +219,7 @@ export const testGoogleMaps = async (req: Request, res: Response) => {
           country,
           facilitiesSearched: facilities.length,
           totalLocationsFound: Object.values(facilityLocations).reduce(
-            (sum: number, arr: any) => sum + arr.length,
+            (sum: number, arr) => sum + (Array.isArray(arr) ? arr.length : 0),
             0,
           ),
         },

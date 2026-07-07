@@ -1,8 +1,8 @@
 import {
-  UserCareerProfile,
   CountryData,
   ScoredCountry,
   CountryRecommendation,
+  CountryRecommendationProfile,
 } from "../types/countryRecommendation";
 import { ExternalAPIService } from "./externalAPIService";
 import { oecdService } from "./oecdService";
@@ -25,7 +25,7 @@ export const getWeights = () => userWeights;
 export class CountryRecommendationService {
   // 메인 추천 로직
   static async getTopCountryRecommendations(
-    userProfile: UserCareerProfile
+    userProfile: CountryRecommendationProfile,
   ): Promise<CountryRecommendation[]> {
     try {
       console.log("국가 데이터 수집 시작...");
@@ -92,7 +92,7 @@ export class CountryRecommendationService {
   // 각 국가별 개별 점수 계산
   private static async calculateCountryScores(
     countries: CountryData[],
-    userProfile: UserCareerProfile
+    userProfile: CountryRecommendationProfile
   ): Promise<ScoredCountry[]> {
     const scoredCountries: ScoredCountry[] = [];
 
@@ -223,7 +223,7 @@ export class CountryRecommendationService {
   // 최종 추천 결과 포맷팅
   private static formatRecommendations(
     topCountries: ScoredCountry[],
-    userProfile: UserCareerProfile,
+    userProfile: CountryRecommendationProfile,
     appliedWeights: Weights
   ): CountryRecommendation[] {
     return topCountries.map((scored, index) => {
@@ -252,7 +252,7 @@ export class CountryRecommendationService {
   // 추천 이유 생성
   private static generateReasons(
     scored: ScoredCountry,
-    userProfile: UserCareerProfile
+    userProfile: CountryRecommendationProfile
   ): string[] {
     const reasons: string[] = [];
     const { country, scores } = scored;

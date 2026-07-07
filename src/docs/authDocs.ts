@@ -1,4 +1,3 @@
-//auth
 export const authSwaggerDocs = {
   paths: {
     "/api/auth/register": {
@@ -32,9 +31,9 @@ export const authSwaggerDocs = {
                 schema: {
                   type: "object",
                   properties: {
-                    _id: {
-                      type: "string",
-                      example: "60c72b2f9b1d8c001c8a4b53",
+                    id: {
+                      type: "integer",
+                      example: 1,
                     },
                     name: { type: "string", example: "user1" },
                     email: { type: "string", example: "user1@1111" },

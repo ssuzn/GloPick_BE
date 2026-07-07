@@ -1,5 +1,5 @@
 import { REQUIRED_FACILITIES } from "../constants/dropdownOptions";
-import { DepartureAirport, InitialBudget } from "../generated/prisma/client";
+import { DepartureAirport, InitialBudget, SimulationInput } from "../generated/prisma/client";
 
 export const toInitialBudgetEnum = (budget: string): InitialBudget => {
   const map: Record<string, InitialBudget> = {
@@ -28,7 +28,7 @@ export const toDepartureAirportEnum = (airport: string): DepartureAirport => {
 };
 
 export const validateSimulationInput = (
-  input: any,
+  input: SimulationInput,
   cityIndex: number,
   initialBudget: string,
   requiredFacilities: string[],

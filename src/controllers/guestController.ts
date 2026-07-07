@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import {
-  UserCareerProfile,
+  CountryRecommendationProfile,
   CountryRecommendation,
 } from "../types/countryRecommendation";
 import {
@@ -74,8 +74,7 @@ export const getGuestCountryRecommendations = asyncHandler(
       });
     }
 
-    // UserCareerProfile 형태로 변환
-    const userProfile: UserCareerProfile = {
+    const userProfile: CountryRecommendationProfile = {
       language,
       jobField: {
         code: desiredJob,
@@ -146,7 +145,7 @@ export const getGuestCountryRecommendations = asyncHandler(
 );
 
 // 비회원 프로필 검증 함수 (회원과 동일한 검증)
-function validateGuestProfile(profile: UserCareerProfile): string | null {
+function validateGuestProfile(profile: CountryRecommendationProfile): string | null {
   // 필수 필드 검증
   if (!profile.language || profile.language.trim() === "") {
     return "사용 가능한 언어를 선택해주세요.";
