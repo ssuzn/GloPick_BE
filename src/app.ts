@@ -9,6 +9,7 @@ import rankingRoutes from "./routes/rankingRoutes";
 import guestRoutes from "./routes/guestRoutes";
 import countryRecommendationRoutes from "./routes/countryRecommendationRoutes";
 import { setupSwagger } from "./docs/swagger";
+import { errorHandler } from "./middlewares/errorHandler";
 
 const app = express();
 
@@ -54,5 +55,7 @@ setupSwagger(app);
 app.get("/", (req, res) => {
   res.send("서버 실행 중");
 });
+
+app.use(errorHandler);
 
 export default app;
