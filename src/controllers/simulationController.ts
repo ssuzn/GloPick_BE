@@ -12,7 +12,22 @@ import {
   createSimulationResultData,
   formatSimulationResult,
 } from "../utils/simulationMapper";
-import { toDepartureAirportEnum, toInitialBudgetEnum, validateSimulationInput } from "../utils/simulationValidator";
+import {
+  toDepartureAirportEnum,
+  toInitialBudgetEnum,
+  validateSimulationInput,
+} from "../utils/simulationValidator";
+import {
+  createSimulationListItem,
+  createSimulationResult,
+  findCompletedSimulationInputs,
+  findSimulationInput,
+  findSimulationListItem,
+  findSimulationResult,
+  findUserProfile,
+  getDesiredJobName,
+  updateSimulationInput,
+} from "../services/simulationService";
 const toJobCode = (desiredJob: string) => desiredJob.replace("JOB_", "");
 
 export const saveSimulationInput = async (req: AuthRequest, res: Response) => {
@@ -25,12 +40,7 @@ export const saveSimulationInput = async (req: AuthRequest, res: Response) => {
       departureAirport,
     } = req.body;
 
-    const input = await prisma.simulationInput.findFirst({
-      where: {
-        id: Number(id),
-        userId: req.user!.id,
-      },
-    });
+    const input = await findSimulationInput(Number(id), req.user!.id);
 
     if (!input) {
       return res.status(404).json({
@@ -55,7 +65,7 @@ export const saveSimulationInput = async (req: AuthRequest, res: Response) => {
       cityIndex,
       initialBudget,
       requiredFacilities,
-      departureAirport
+      departureAirport,
     );
 
     if (!validation.isValid) {
@@ -68,22 +78,11 @@ export const saveSimulationInput = async (req: AuthRequest, res: Response) => {
 
     const actualSelectedCity = input.recommendedCities[cityIndex];
 
-    const existingInputs = await prisma.simulationInput.findMany({
-      where: {
-        userId: req.user!.id,
-        profileId: input.profileId,
-        selectedCountry: input.selectedCountry,
-        selectedCity: {
-          not: null,
-        },
-        initialBudget: {
-          not: null,
-        },
-        departureAirport: {
-          not: null,
-        },
-      },
-    });
+    const existingInputs = await findCompletedSimulationInputs(
+      req.user!.id,
+      input.profileId,
+      input.selectedCountry,
+    );
 
     const sortedRequiredFacilities = [...requiredFacilities].sort().join(",");
 
@@ -95,23 +94,22 @@ export const saveSimulationInput = async (req: AuthRequest, res: Response) => {
       return (
         existing.selectedCity === actualSelectedCity &&
         existing.initialBudget === toInitialBudgetEnum(initialBudget) &&
-        existing.departureAirport === toDepartureAirportEnum(departureAirport) &&
+        existing.departureAirport ===
+          toDepartureAirportEnum(departureAirport) &&
         sortedExisting === sortedRequiredFacilities
       );
     });
 
     if (existingInput) {
-      const existingSimulation = await prisma.simulationResult.findFirst({
-        where: {
-          inputId: existingInput.id,
-          userId: req.user!.id,
-        },
-      });
+      const existingSimulation = await findSimulationResult(
+        existingInput.id,
+        req.user!.id,
+      );
 
       if (existingSimulation) {
         const flightLinks = createFlightLinks(
           departureAirport,
-          existingInput.selectedCity as string
+          existingInput.selectedCity as string,
         );
 
         return res.status(200).json({
@@ -128,16 +126,11 @@ export const saveSimulationInput = async (req: AuthRequest, res: Response) => {
       }
     }
 
-    const updatedInput = await prisma.simulationInput.update({
-      where: {
-        id: input.id,
-      },
-      data: {
-        selectedCity: actualSelectedCity,
-        initialBudget: toInitialBudgetEnum(initialBudget),
-        requiredFacilities,
-        departureAirport: toDepartureAirportEnum(departureAirport),
-      },
+    const updatedInput = await updateSimulationInput(input.id, {
+      selectedCity: actualSelectedCity,
+      initialBudget: toInitialBudgetEnum(initialBudget),
+      requiredFacilities,
+      departureAirport: toDepartureAirportEnum(departureAirport),
     });
 
     const gptResult = await generateSimulationResponse(updatedInput as any);
@@ -153,56 +146,41 @@ export const saveSimulationInput = async (req: AuthRequest, res: Response) => {
         facilityLocations = await searchFacilities(
           actualSelectedCity,
           updatedInput.selectedCountry,
-          updatedInput.requiredFacilities
+          updatedInput.requiredFacilities,
         );
       } catch (error) {
         console.error("Google Maps API 호출 실패:", error);
       }
     }
 
-    const saved = await prisma.simulationResult.create({
-      data: {
-        userId: req.user!.id,
-        inputId: updatedInput.id,
-        country: updatedInput.selectedCountry,
-        ...createSimulationResultData(gptResult, facilityLocations),
-      },
-    });
+    const saved = await createSimulationResult(
+      req.user!.id,
+      updatedInput.id,
+      updatedInput.selectedCountry,
+      gptResult,
+      facilityLocations,
+    );
 
-    const userProfile = await prisma.userProfile.findFirst({
-      where: {
-        id: updatedInput.profileId,
-        userId: req.user!.id,
-      },
-    });
+    const userProfile = await findUserProfile(
+      updatedInput.profileId,
+      req.user!.id,
+    );
+    const desiredJob = getDesiredJobName(userProfile?.desiredJob);
 
-    const jobCode = userProfile?.desiredJob
-      ? toJobCode(userProfile.desiredJob)
-      : "2";
-
-    const jobField =
-      JOB_FIELDS.find((field) => field.code === jobCode) || JOB_FIELDS[1];
-
-    const desiredJob = jobField.nameKo;
-
-    const isAlreadyExist = await prisma.simulationList.findFirst({
-      where: {
-        userId: req.user!.id,
-        job: desiredJob,
-        country: updatedInput.selectedCountry,
-        city: actualSelectedCity,
-      },
-    });
+    const isAlreadyExist = await findSimulationListItem(
+      req.user!.id,
+      desiredJob,
+      updatedInput.selectedCountry,
+      actualSelectedCity,
+    );
 
     if (!isAlreadyExist) {
-      await prisma.simulationList.create({
-        data: {
-          userId: req.user!.id,
-          job: desiredJob,
-          country: updatedInput.selectedCountry,
-          city: actualSelectedCity,
-        },
-      });
+      await createSimulationListItem(
+        req.user!.id,
+        desiredJob,
+        updatedInput.selectedCountry,
+        actualSelectedCity,
+      );
     }
 
     return res.status(201).json({
@@ -317,7 +295,7 @@ export const recommendCities = async (req: AuthRequest, res: Response) => {
     const cityRecommendations = await getSimpleCityRecommendations(
       selectedCountry,
       userJob || undefined,
-      userLanguage || undefined
+      userLanguage || undefined,
     );
 
     const newInput = await prisma.simulationInput.create({
@@ -352,7 +330,7 @@ export const recommendCities = async (req: AuthRequest, res: Response) => {
 
 export const generateAndSaveSimulation = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ) => {
   const { id } = req.params;
 
@@ -388,7 +366,7 @@ export const generateAndSaveSimulation = async (
           result: formatSimulationResult(existing),
           flightLinks: createFlightLinks(
             input.departureAirport as string,
-            input.selectedCity as string
+            input.selectedCity as string,
           ),
         },
       });
@@ -425,7 +403,7 @@ export const generateAndSaveSimulation = async (
 
     const flightLinks = createFlightLinks(
       input.departureAirport as string,
-      arrivalAirportCode
+      arrivalAirportCode,
     );
 
     let facilityLocations = {};
@@ -434,7 +412,7 @@ export const generateAndSaveSimulation = async (
       facilityLocations = await searchFacilities(
         selectedCity,
         input.selectedCountry,
-        input.requiredFacilities
+        input.requiredFacilities,
       );
     } catch (error) {
       console.error("Google Maps API 호출 실패:", error);
@@ -470,7 +448,7 @@ export const generateAndSaveSimulation = async (
 
 export const getSimulationFlightLinks = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ) => {
   try {
     const { id } = req.params;
@@ -500,7 +478,7 @@ export const getSimulationFlightLinks = async (
 
     const flightLinks = createFlightLinks(
       simulation.departureAirport,
-      simulation.selectedCity
+      simulation.selectedCity,
     );
 
     return res.status(200).json({
@@ -579,7 +557,7 @@ export const testGoogleMaps = async (req: Request, res: Response) => {
           facilitiesSearched: facilities.length,
           totalLocationsFound: Object.values(facilityLocations).reduce(
             (sum: number, arr: any) => sum + arr.length,
-            0
+            0,
           ),
         },
       },
