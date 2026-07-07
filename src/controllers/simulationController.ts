@@ -9,20 +9,28 @@ import {
   saveSimulation,
 } from "../services/simulationService";
 import { createCityRecommendations } from "../services/cityRecommendationService";
-import {
-  RecommendCitiesRequestDto,
-  SaveSimulationRequestDto,
-} from "../dto/simulation.dto";
+import { recommendCitiesSchema, saveSimulationInputSchema } from "../validators/simulation.schema";
 
 export const saveSimulationInput = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
+    const parseResult = saveSimulationInputSchema.safeParse(req.body);
+
+    if (!parseResult.success) {
+      return res.status(400).json({
+        code: 400,
+        message:
+          parseResult.error.issues[0]?.message || "요청값이 올바르지 않습니다.",
+        data: null,
+      });
+    }
+
     const {
       selectedCityIndex,
       initialBudget,
       requiredFacilities,
       departureAirport,
-    }: SaveSimulationRequestDto = req.body;
+    } = parseResult.data;
 
     const input = await findSimulationInput(Number(id), req.user!.id);
 
@@ -89,7 +97,18 @@ export const saveSimulationInput = async (req: AuthRequest, res: Response) => {
 export const recommendCities = async (req: AuthRequest, res: Response) => {
   try {
     const { recommendationId, profileId } = req.params;
-    const { selectedCountryIndex }: RecommendCitiesRequestDto = req.body;
+    const parseResult = recommendCitiesSchema.safeParse(req.body);
+
+    if (!parseResult.success) {
+      return res.status(400).json({
+        code: 400,
+        message:
+          parseResult.error.issues[0]?.message || "요청값이 올바르지 않습니다.",
+        data: null,
+      });
+    }
+
+    const { selectedCountryIndex } = parseResult.data;
 
     const result = await createCityRecommendations({
       userId: req.user!.id,
