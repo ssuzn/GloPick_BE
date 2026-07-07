@@ -3,11 +3,10 @@ import { protect } from "../middlewares/authMiddleware";
 import { asyncHandler } from "../utils/asyncHandler";
 import {
   saveSimulationInput,
-  generateAndSaveSimulation,
   recommendCities,
   getSimulationFlightLinks,
-  getSimulationList,
   testGoogleMaps,
+  getSimulationList,
 } from "../controllers/simulationController";
 
 const router = express.Router();
@@ -26,8 +25,7 @@ router.post(
 // 2. 시뮬레이션 추가 정보 입력 + 시뮬레이션 자동 생성 (통합됨)
 router.post("/input/:id", protect, asyncHandler(saveSimulationInput));
 
-// 3. [Deprecated] GPT 기반 시뮬레이션 생성 - 이제 /input/{id}에서 자동으로 처리됨
-// router.post("/:id/generate", protect, asyncHandler(generateAndSaveSimulation));
+router.get("/list", protect, asyncHandler(getSimulationList));
 
 // 항공권 링크 포함 시뮬레이션 결과 조회
 router.get(

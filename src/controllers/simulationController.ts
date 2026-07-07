@@ -6,29 +6,23 @@ import {
   getSimpleCityRecommendations,
 } from "../services/gptsimulationService";
 import { createFlightLinks } from "../utils/flightLinkGenerator";
-import { JOB_FIELDS } from "../constants/dropdownOptions";
 import { searchFacilities, getCityCenter } from "../services/googleMapsService";
 import {
   createSimulationResultData,
   formatSimulationResult,
 } from "../utils/simulationMapper";
 import {
-  toDepartureAirportEnum,
-  toInitialBudgetEnum,
   validateSimulationInput,
 } from "../utils/simulationValidator";
 import {
-  createSimulationListItem,
-  createSimulationResult,
-  findCompletedSimulationInputs,
+  createCityRecommendationInput,
+  findLatestSimulationInputByCountry,
+  findRecommendationWithItems,
   findSimulationInput,
-  findSimulationListItem,
-  findSimulationResult,
   findUserProfile,
   getDesiredJobName,
-  updateSimulationInput,
+  saveSimulation,
 } from "../services/simulationService";
-const toJobCode = (desiredJob: string) => desiredJob.replace("JOB_", "");
 
 export const saveSimulationInput = async (req: AuthRequest, res: Response) => {
   try {
@@ -76,123 +70,21 @@ export const saveSimulationInput = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    const actualSelectedCity = input.recommendedCities[cityIndex];
-
-    const existingInputs = await findCompletedSimulationInputs(
-      req.user!.id,
-      input.profileId,
-      input.selectedCountry,
-    );
-
-    const sortedRequiredFacilities = [...requiredFacilities].sort().join(",");
-
-    const existingInput = existingInputs.find((existing) => {
-      const sortedExisting = [...(existing.requiredFacilities || [])]
-        .sort()
-        .join(",");
-
-      return (
-        existing.selectedCity === actualSelectedCity &&
-        existing.initialBudget === toInitialBudgetEnum(initialBudget) &&
-        existing.departureAirport ===
-          toDepartureAirportEnum(departureAirport) &&
-        sortedExisting === sortedRequiredFacilities
-      );
-    });
-
-    if (existingInput) {
-      const existingSimulation = await findSimulationResult(
-        existingInput.id,
-        req.user!.id,
-      );
-
-      if (existingSimulation) {
-        const flightLinks = createFlightLinks(
-          departureAirport,
-          existingInput.selectedCity as string,
-        );
-
-        return res.status(200).json({
-          code: 200,
-          message: "이미 동일한 조건으로 시뮬레이션이 생성되어 있습니다.",
-          data: {
-            isExisting: true,
-            inputId: existingInput.id,
-            simulationId: existingSimulation.id,
-            result: formatSimulationResult(existingSimulation),
-            flightLinks,
-          },
-        });
-      }
-    }
-
-    const updatedInput = await updateSimulationInput(input.id, {
-      selectedCity: actualSelectedCity,
-      initialBudget: toInitialBudgetEnum(initialBudget),
+    const result = await saveSimulation({
+      input,
+      userId: req.user!.id,
+      cityIndex,
+      initialBudget,
       requiredFacilities,
-      departureAirport: toDepartureAirportEnum(departureAirport),
+      departureAirport,
     });
 
-    const gptResult = await generateSimulationResponse(updatedInput as any);
-    const arrivalAirportCode =
-      gptResult?.nearestAirport?.code || actualSelectedCity;
-
-    const flightLinks = createFlightLinks(departureAirport, arrivalAirportCode);
-
-    let facilityLocations = {};
-
-    if (updatedInput.requiredFacilities.length > 0) {
-      try {
-        facilityLocations = await searchFacilities(
-          actualSelectedCity,
-          updatedInput.selectedCountry,
-          updatedInput.requiredFacilities,
-        );
-      } catch (error) {
-        console.error("Google Maps API 호출 실패:", error);
-      }
-    }
-
-    const saved = await createSimulationResult(
-      req.user!.id,
-      updatedInput.id,
-      updatedInput.selectedCountry,
-      gptResult,
-      facilityLocations,
-    );
-
-    const userProfile = await findUserProfile(
-      updatedInput.profileId,
-      req.user!.id,
-    );
-    const desiredJob = getDesiredJobName(userProfile?.desiredJob);
-
-    const isAlreadyExist = await findSimulationListItem(
-      req.user!.id,
-      desiredJob,
-      updatedInput.selectedCountry,
-      actualSelectedCity,
-    );
-
-    if (!isAlreadyExist) {
-      await createSimulationListItem(
-        req.user!.id,
-        desiredJob,
-        updatedInput.selectedCountry,
-        actualSelectedCity,
-      );
-    }
-
-    return res.status(201).json({
-      code: 201,
-      message: "시뮬레이션 입력 및 생성 완료",
-      data: {
-        isExisting: false,
-        inputId: updatedInput.id,
-        simulationId: saved.id,
-        result: formatSimulationResult(saved),
-        flightLinks,
-      },
+    return res.status(result.isExisting ? 200 : 201).json({
+      code: result.isExisting ? 200 : 201,
+      message: result.isExisting
+        ? "이미 동일한 조건으로 시뮬레이션이 생성되어 있습니다."
+        : "시뮬레이션 입력 및 생성 완료",
+      data: result,
     });
   } catch (error) {
     console.error("시뮬레이션 입력 및 생성 실패:", error);
@@ -209,20 +101,11 @@ export const recommendCities = async (req: AuthRequest, res: Response) => {
   const { selectedCountryIndex } = req.body;
 
   try {
-    const recommendation = await prisma.countryRecommendationResult.findFirst({
-      where: {
-        id: Number(recommendationId),
-        userId: req.user!.id,
-        profileId: Number(profileId),
-      },
-      include: {
-        recommendations: {
-          orderBy: {
-            rank: "asc",
-          },
-        },
-      },
-    });
+    const recommendation = await findRecommendationWithItems(
+      Number(recommendationId),
+      req.user!.id,
+      Number(profileId),
+    );
 
     if (!recommendation) {
       return res.status(404).json({
@@ -246,16 +129,11 @@ export const recommendCities = async (req: AuthRequest, res: Response) => {
     const selectedCountry =
       recommendation.recommendations[selectedCountryIndex].country;
 
-    const existingInput = await prisma.simulationInput.findFirst({
-      where: {
-        userId: req.user!.id,
-        profileId: Number(profileId),
-        selectedCountry,
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+    const existingInput = await findLatestSimulationInputByCountry(
+      req.user!.id,
+      Number(profileId),
+      selectedCountry,
+    );
 
     if (existingInput) {
       return res.status(409).json({
@@ -270,12 +148,7 @@ export const recommendCities = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    const profile = await prisma.userProfile.findFirst({
-      where: {
-        id: Number(profileId),
-        userId: req.user!.id,
-      },
-    });
+    const profile = await findUserProfile(Number(profileId), req.user!.id);
 
     if (!profile) {
       return res.status(404).json({
@@ -285,11 +158,7 @@ export const recommendCities = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    const jobCode = toJobCode(profile.desiredJob);
-    const jobField =
-      JOB_FIELDS.find((field) => field.code === jobCode) || JOB_FIELDS[1];
-
-    const userJob = jobField.nameKo;
+    const userJob = getDesiredJobName(profile.desiredJob);
     const userLanguage = profile.language;
 
     const cityRecommendations = await getSimpleCityRecommendations(
@@ -298,15 +167,12 @@ export const recommendCities = async (req: AuthRequest, res: Response) => {
       userLanguage || undefined,
     );
 
-    const newInput = await prisma.simulationInput.create({
-      data: {
-        userId: req.user!.id,
-        profileId: Number(profileId),
-        selectedCountry,
-        recommendedCities: cityRecommendations.map((city: any) => city.name),
-        requiredFacilities: [],
-      },
-    });
+    const newInput = await createCityRecommendationInput(
+      req.user!.id,
+      Number(profileId),
+      selectedCountry,
+      cityRecommendations.map((city: any) => city.name),
+    );
 
     return res.status(200).json({
       code: 200,
@@ -323,124 +189,6 @@ export const recommendCities = async (req: AuthRequest, res: Response) => {
     return res.status(500).json({
       code: 500,
       message: "GPT 호출 실패",
-      data: null,
-    });
-  }
-};
-
-export const generateAndSaveSimulation = async (
-  req: AuthRequest,
-  res: Response,
-) => {
-  const { id } = req.params;
-
-  try {
-    const input = await prisma.simulationInput.findFirst({
-      where: {
-        id: Number(id),
-        userId: req.user!.id,
-      },
-    });
-
-    if (!input || !Array.isArray(input.recommendedCities)) {
-      return res.status(404).json({
-        code: 404,
-        message: "입력 정보 또는 추천 도시 목록을 찾을 수 없습니다.",
-        data: null,
-      });
-    }
-
-    const existing = await prisma.simulationResult.findFirst({
-      where: {
-        inputId: input.id,
-        userId: req.user!.id,
-      },
-    });
-
-    if (existing) {
-      return res.status(200).json({
-        code: 200,
-        message: "이미 생성된 시뮬레이션입니다.",
-        data: {
-          simulationId: existing.id,
-          result: formatSimulationResult(existing),
-          flightLinks: createFlightLinks(
-            input.departureAirport as string,
-            input.selectedCity as string,
-          ),
-        },
-      });
-    }
-
-    if (!input.selectedCity || !input.initialBudget) {
-      return res.status(400).json({
-        code: 400,
-        message: "선택 도시 또는 초기 예산 정보가 없습니다.",
-        data: null,
-      });
-    }
-
-    if (!input.requiredFacilities || input.requiredFacilities.length === 0) {
-      return res.status(400).json({
-        code: 400,
-        message: "필요한 시설 정보가 없습니다.",
-        data: null,
-      });
-    }
-
-    if (!input.departureAirport) {
-      return res.status(400).json({
-        code: 400,
-        message: "출발 공항 정보가 없습니다.",
-        data: null,
-      });
-    }
-
-    const selectedCity = input.selectedCity;
-
-    const gptResult = await generateSimulationResponse(input as any);
-    const arrivalAirportCode = gptResult?.nearestAirport?.code || selectedCity;
-
-    const flightLinks = createFlightLinks(
-      input.departureAirport as string,
-      arrivalAirportCode,
-    );
-
-    let facilityLocations = {};
-
-    try {
-      facilityLocations = await searchFacilities(
-        selectedCity,
-        input.selectedCountry,
-        input.requiredFacilities,
-      );
-    } catch (error) {
-      console.error("Google Maps API 호출 실패:", error);
-    }
-
-    const saved = await prisma.simulationResult.create({
-      data: {
-        userId: req.user!.id,
-        inputId: input.id,
-        country: input.selectedCountry,
-        ...createSimulationResultData(gptResult, facilityLocations),
-      },
-    });
-
-    return res.status(201).json({
-      code: 201,
-      message: "시뮬레이션 생성 및 저장 완료",
-      data: {
-        simulationId: saved.id,
-        result: formatSimulationResult(saved),
-        flightLinks,
-      },
-    });
-  } catch (error) {
-    console.error("시뮬레이션 생성 실패:", error);
-    return res.status(500).json({
-      code: 500,
-      message: "GPT 호출 또는 저장 실패",
       data: null,
     });
   }
