@@ -1,28 +1,14 @@
 import { Request, Response } from "express";
 import { AuthRequest } from "../middlewares/authMiddleware";
 import { prisma } from "../db";
-import {
-  generateSimulationResponse,
-  getSimpleCityRecommendations,
-} from "../services/gptsimulationService";
 import { createFlightLinks } from "../utils/flightLinkGenerator";
 import { searchFacilities, getCityCenter } from "../services/googleMapsService";
+import { validateSimulationInput } from "../utils/simulationValidator";
 import {
-  createSimulationResultData,
-  formatSimulationResult,
-} from "../utils/simulationMapper";
-import {
-  validateSimulationInput,
-} from "../utils/simulationValidator";
-import {
-  createCityRecommendationInput,
-  findLatestSimulationInputByCountry,
-  findRecommendationWithItems,
   findSimulationInput,
-  findUserProfile,
-  getDesiredJobName,
   saveSimulation,
 } from "../services/simulationService";
+import { createCityRecommendations } from "../services/cityRecommendationService";
 
 export const saveSimulationInput = async (req: AuthRequest, res: Response) => {
   try {
@@ -97,98 +83,23 @@ export const saveSimulationInput = async (req: AuthRequest, res: Response) => {
 };
 
 export const recommendCities = async (req: AuthRequest, res: Response) => {
-  const { recommendationId, profileId } = req.params;
-  const { selectedCountryIndex } = req.body;
-
   try {
-    const recommendation = await findRecommendationWithItems(
-      Number(recommendationId),
-      req.user!.id,
-      Number(profileId),
-    );
+    const { recommendationId, profileId } = req.params;
+    const { selectedCountryIndex } = req.body;
 
-    if (!recommendation) {
-      return res.status(404).json({
-        code: 404,
-        message: "추천 결과를 찾을 수 없습니다.",
-        data: null,
-      });
-    }
-
-    if (
-      selectedCountryIndex < 0 ||
-      selectedCountryIndex >= recommendation.recommendations.length
-    ) {
-      return res.status(400).json({
-        code: 400,
-        message: "유효하지 않은 국가 인덱스입니다.",
-        data: null,
-      });
-    }
-
-    const selectedCountry =
-      recommendation.recommendations[selectedCountryIndex].country;
-
-    const existingInput = await findLatestSimulationInputByCountry(
-      req.user!.id,
-      Number(profileId),
-      selectedCountry,
-    );
-
-    if (existingInput) {
-      return res.status(409).json({
-        code: 409,
-        message: "이미 해당 국가에 대한 도시 추천을 받았습니다.",
-        data: {
-          isExisting: true,
-          inputId: existingInput.id,
-          selectedCountry: existingInput.selectedCountry,
-          recommendedCities: existingInput.recommendedCities,
-        },
-      });
-    }
-
-    const profile = await findUserProfile(Number(profileId), req.user!.id);
-
-    if (!profile) {
-      return res.status(404).json({
-        code: 404,
-        message: "프로필을 찾을 수 없습니다.",
-        data: null,
-      });
-    }
-
-    const userJob = getDesiredJobName(profile.desiredJob);
-    const userLanguage = profile.language;
-
-    const cityRecommendations = await getSimpleCityRecommendations(
-      selectedCountry,
-      userJob || undefined,
-      userLanguage || undefined,
-    );
-
-    const newInput = await createCityRecommendationInput(
-      req.user!.id,
-      Number(profileId),
-      selectedCountry,
-      cityRecommendations.map((city: any) => city.name),
-    );
-
-    return res.status(200).json({
-      code: 200,
-      message: "도시 추천 성공",
-      data: {
-        isExisting: false,
-        inputId: newInput.id,
-        selectedCountry,
-        recommendedCities: cityRecommendations,
-      },
+    const result = await createCityRecommendations({
+      userId: req.user!.id,
+      recommendationId: Number(recommendationId),
+      profileId: Number(profileId),
+      selectedCountryIndex: Number(selectedCountryIndex),
     });
+
+    return res.status(result.statusCode).json(result.body);
   } catch (error) {
     console.error("도시 추천 실패:", error);
     return res.status(500).json({
       code: 500,
-      message: "GPT 호출 실패",
+      message: "도시 추천 실패",
       data: null,
     });
   }
