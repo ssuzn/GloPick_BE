@@ -13,7 +13,6 @@ import {
 } from "../controllers/mypageController";
 import { protect } from "../middlewares/authMiddleware";
 import { asyncHandler } from "../utils/asyncHandler";
-import { getSimulationList } from "../controllers/simulationController";
 
 const router = express.Router();
 
@@ -54,8 +53,5 @@ router.get(
   protect,
   asyncHandler(getRecommendationsByProfileId)
 );
-
-// 시뮬레이션 요약 리스트 조회 API
-router.get("/simulations/list", protect, asyncHandler(getSimulationList));
 
 export default router;

@@ -1,7 +1,12 @@
-// 사용자 입력 데이터 타입
-export interface UserCareerProfile {
-  language: string; // 사용 가능 언어 (단일 선택)
-  jobField: ISCOJobField; // ISCO-08 기준 직무 분야
+export interface CountryRecommendationProfile {
+  language: string;
+
+  jobField: {
+    code: string;
+    nameKo: string;
+    nameEn: string;
+  };
+
   qualityOfLifeWeights: {
     income: number;
     jobs: number;
@@ -9,21 +14,16 @@ export interface UserCareerProfile {
     lifeSatisfaction: number;
     safety: number;
   };
-  languageScore?: number; // 언어 점수
-  jobScore?: number; // 직무 점수
-  qualityOfLifeScore?: number; // 삶의 질 점수
-  weights?: {
-    languageWeight: number; // 언어 가중치
-    jobWeight: number; // 직무 가중치
-    qualityOfLifeWeight: number; // 삶의 질 가중치
-  };
-}
 
-// ISCO-08 직무 분류
-export interface ISCOJobField {
-  code: string; // ISCO-08 대분류 코드 ('1'-'9', '0')
-  nameKo: string; // 한국어 직무명
-  nameEn: string; // 영어 직무명
+  languageScore?: number;
+  jobScore?: number;
+  qualityOfLifeScore?: number;
+
+  weights?: {
+    languageWeight: number;
+    jobWeight: number;
+    qualityOfLifeWeight: number;
+  };
 }
 
 // 국가 데이터 타입

@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import {
-  UserCareerProfile,
+  CountryRecommendationProfile,
   CountryRecommendation,
 } from "../types/countryRecommendation";
 import {
@@ -157,7 +157,7 @@ export const getCountryRecommendations = asyncHandler(
       const jobField =
         JOB_FIELDS.find((field) => field.code === jobCode) || JOB_FIELDS[1];
 
-      const userProfile: UserCareerProfile = {
+      const userProfile: CountryRecommendationProfile = {
         language: normalizeLanguage(dbProfile.language),
         jobField: {
           code: jobField.code,

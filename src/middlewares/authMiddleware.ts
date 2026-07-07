@@ -38,10 +38,7 @@ export const protect: RequestHandler = async (req, res, next): Promise<void> => 
       return;
     }
 
-    req.user = {
-      ...user,
-      _id: user.id,
-    } as AuthUser;
+    req.user = user as AuthUser;
 
     next();
   } catch (error) {
@@ -79,10 +76,7 @@ export const optionalAuth: RequestHandler = async (
       });
 
       if (user) {
-        req.user = {
-          ...user,
-          _id: user.id,
-        } as AuthUser;
+        req.user = user as AuthUser;
       }
     } catch (error) {
       console.log("토큰 검증 실패, 비인증 상태로 진행:", error);

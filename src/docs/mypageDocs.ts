@@ -19,9 +19,9 @@ export const mypageSwaggerDocs = {
                 schema: {
                   type: "object",
                   properties: {
-                    _id: {
-                      type: "string",
-                      example: "60c72b2f9b1d8c001c8a4b53",
+                    id: {
+                      type: "integer",
+                      example: 1,
                     },
                     name: { type: "string", example: "user1" },
                     email: { type: "string", example: "user1@1111" },
@@ -74,7 +74,7 @@ export const mypageSwaggerDocs = {
                 schema: {
                   type: "object",
                   properties: {
-                    _id: { type: "string", example: "abc123" },
+                    id: { type: "integer", example: 1 },
                     name: { type: "string", example: "newname" },
                     email: { type: "string", example: "newemail@example.com" },
                     birth: { type: "string", example: "2002-02-02" },
@@ -380,9 +380,9 @@ export const mypageSwaggerDocs = {
                       items: {
                         type: "object",
                         properties: {
-                          _id: {
-                            type: "string",
-                            example: "660f62c89abf1b001c66e678",
+                          id: {
+                            type: "integer",
+                            example: 1,
                           },
                           profile: {
                             type: "object",
@@ -536,9 +536,9 @@ export const mypageSwaggerDocs = {
                       items: {
                         type: "object",
                         properties: {
-                          _id: {
-                            type: "string",
-                            example: "6641abc123...",
+                          id: {
+                            type: "integer",
+                            example: 1,
                           },
                           input: {
                             type: "object",
@@ -675,7 +675,7 @@ export const mypageSwaggerDocs = {
                       items: {
                         type: "object",
                         properties: {
-                          _id: { type: "string", example: "663fa12345abcd..." },
+                          id: { type: "integer", example: 1 },
                           profile: {
                             type: "object",
                             properties: {
@@ -836,7 +836,7 @@ export const mypageSwaggerDocs = {
                       items: {
                         type: "object",
                         properties: {
-                          _id: { type: "string", example: "664abc..." },
+                          id: { type: "integer", example: 1 },
                           input: {
                             type: "object",
                             properties: {
@@ -946,9 +946,9 @@ export const mypageSwaggerDocs = {
                       items: {
                         type: "object",
                         properties: {
-                          _id: {
-                            type: "string",
-                            example: "663fe59a5230fdd9c41a67af",
+                          id: {
+                            type: "integer",
+                            example: 1,
                           },
                           job: {
                             type: "string",

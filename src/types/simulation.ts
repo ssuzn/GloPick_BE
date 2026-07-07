@@ -1,55 +1,74 @@
-// src/types/simulation.ts
+import {
+  DepartureAirport,
+  InitialBudget,
+  SimulationInput,
+  SimulationResult,
+} from "../generated/prisma/client";
 
-export interface SimulationInputWithCity {
-  selectedCountry: string;
+export interface SaveSimulationParams {
+  input: SimulationInput;
+  userId: number;
+  cityIndex: number;
+  initialBudget: string;
+  requiredFacilities: string[];
+  departureAirport: string;
+}
+
+export interface UpdateSimulationInputData {
   selectedCity: string;
-  budget: number;
-  period: number;
-  language: string;
-  hasLicense: boolean;
-  jobPreference: string;
-  accommodation: string;
-  withFamily: string;
-  visaStatus: string;
-  extraWishes?: string;
+  initialBudget: InitialBudget;
+  requiredFacilities: string[];
+  departureAirport: DepartureAirport;
 }
 
-export interface CitySimulation {
-  recommendedCity: string;
-  localInfo: {
-    publicTransport: string;
-    safetyLevel: string;
-    climateSummary: string;
-    essentialFacilities: string[];
+export interface GenerateSimulationResultParams {
+  input: SimulationInput;
+  userId: number;
+  departureAirport: string;
+  selectedCity: string;
+}
+
+export interface GPTSimulationResponse {
+  recommendedCity?: string;
+  nearestAirport?: {
+    code?: string;
+    name?: string;
   };
-  initialSetup: {
-    shortTermHousingOptions: string[];
-    longTermHousingPlatforms: string[];
+  localInfo?: {
+    essentialFacilities?: string[];
+    publicTransport?: string;
+    safetyLevel?: string;
+    climateSummary?: string;
+    koreanCommunity?: string;
+    culturalTips?: string;
+    warnings?: string;
   };
-  jobReality: {
-    commonJobs: string[];
-    jobSearchPlatforms: string[];
+  estimatedMonthlyCost?: {
+    housing?: string;
+    food?: string;
+    transportation?: string;
+    etc?: string;
+    total?: string;
+    oneYearCost?: string;
+    costCuttingTips?: string;
+    cpi?: string;
   };
-  culturalIntegration: {
-    koreanResourcesLinks: string[];
-    culturalIntegrationPrograms: string[];
+  initialSetup?: {
+    shortTermHousingOptions?: string[];
+    longTermHousingPlatforms?: string[];
+    mobilePlan?: string;
+    bankAccount?: string;
+  };
+  jobReality?: {
+    jobSearchPlatforms?: string[];
+    languageRequirement?: string;
+    visaLimitationTips?: string;
+  };
+  culturalIntegration?: {
+    koreanPopulationRate?: string;
+    foreignResidentRatio?: string;
+    koreanResourcesLinks?: string[];
   };
 }
 
-export interface JobAccessibilityScore {
-  jobDemand: number;
-  foreignAcceptance: number;
-  specPreparation: number;
-}
-
-export interface MigrationFactors {
-  languageLevel: number;
-  visaScore: number;
-  budgetScore: number;
-  withFamily: string;
-  koreanCommunityScore: number;
-}
-
-export type SimulationResult = CitySimulation & {
-  migrationSuitability: number;
-};
+export type SimulationResultRecord = SimulationResult;
