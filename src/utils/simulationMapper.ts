@@ -1,6 +1,8 @@
+import { GPTSimulationResponse, SimulationResultRecord } from "../types/simulation";
+
 export const createSimulationResultData = (
-  gptResult: any,
-  facilityLocations: any
+  gptResult: GPTSimulationResponse,
+  facilityLocations: any = {},
 ) => {
   return {
     recommendedCity: gptResult.recommendedCity ?? null,
@@ -44,7 +46,7 @@ export const createSimulationResultData = (
   };
 };
 
-export const formatSimulationResult = (simulation: any) => {
+export const formatSimulationResult = (simulation: SimulationResultRecord) => {
   return {
     country: simulation.country,
     recommendedCity: simulation.recommendedCity,

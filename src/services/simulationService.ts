@@ -1,15 +1,22 @@
 import { prisma } from "../db";
-import { DepartureAirport, InitialBudget } from "../generated/prisma/client";
 import { JOB_FIELDS } from "../constants/dropdownOptions";
-import { createSimulationResultData } from "../utils/simulationMapper";
+import {
+  createSimulationResultData,
+  formatSimulationResult,
+} from "../utils/simulationMapper";
 import { generateSimulationResponse } from "./gptsimulationService";
 import { searchFacilities } from "./googleMapsService";
 import { createFlightLinks } from "../utils/flightLinkGenerator";
-import { formatSimulationResult } from "../utils/simulationMapper";
 import {
   toInitialBudgetEnum,
   toDepartureAirportEnum,
 } from "../utils/simulationValidator";
+import {
+  GenerateSimulationResultParams,
+  SaveSimulationParams,
+  UpdateSimulationInputData,
+  GPTSimulationResponse,
+} from "../types/simulation";
 
 export const findSimulationInput = async (id: number, userId: number) => {
   return prisma.simulationInput.findFirst({
@@ -54,12 +61,7 @@ export const findSimulationResult = async (inputId: number, userId: number) => {
 
 export const updateSimulationInput = async (
   inputId: number,
-  data: {
-    selectedCity: string;
-    initialBudget: InitialBudget;
-    requiredFacilities: string[];
-    departureAirport: DepartureAirport;
-  },
+  data: UpdateSimulationInputData,
 ) => {
   return prisma.simulationInput.update({
     where: {
@@ -73,8 +75,8 @@ export const createSimulationResult = async (
   userId: number,
   inputId: number,
   selectedCountry: string,
-  gptResult: any,
-  facilityLocations: any,
+  gptResult: GPTSimulationResponse,
+  facilityLocations: any = {},
 ) => {
   return prisma.simulationResult.create({
     data: {
@@ -195,13 +197,8 @@ export const generateSimulationResult = async ({
   userId,
   departureAirport,
   selectedCity,
-}: {
-  input: any;
-  userId: number;
-  departureAirport: string;
-  selectedCity: string;
-}) => {
-  const gptResult = await generateSimulationResponse(input as any);
+}: GenerateSimulationResultParams) => {
+  const gptResult = await generateSimulationResponse(input);
 
   const arrivalAirportCode = gptResult?.nearestAirport?.code || selectedCity;
 
@@ -243,14 +240,7 @@ export const saveSimulation = async ({
   initialBudget,
   requiredFacilities,
   departureAirport,
-}: {
-  input: any;
-  userId: number;
-  cityIndex: number;
-  initialBudget: string;
-  requiredFacilities: string[];
-  departureAirport: string;
-}) => {
+}: SaveSimulationParams) => {
   const actualSelectedCity = input.recommendedCities[cityIndex];
 
   const existingInputs = await findCompletedSimulationInputs(
