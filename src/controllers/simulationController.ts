@@ -9,6 +9,7 @@ import {
   saveSimulation,
 } from "../services/simulationService";
 import { createCityRecommendations } from "../services/cityRecommendationService";
+import { RecommendCitiesRequestDto, SaveSimulationRequestDto } from "../dto/simulation.dto";
 
 export const saveSimulationInput = async (req: AuthRequest, res: Response) => {
   try {
@@ -18,7 +19,7 @@ export const saveSimulationInput = async (req: AuthRequest, res: Response) => {
       initialBudget,
       requiredFacilities,
       departureAirport,
-    } = req.body;
+    }: SaveSimulationRequestDto = req.body;
 
     const input = await findSimulationInput(Number(id), req.user!.id);
 
@@ -85,7 +86,7 @@ export const saveSimulationInput = async (req: AuthRequest, res: Response) => {
 export const recommendCities = async (req: AuthRequest, res: Response) => {
   try {
     const { recommendationId, profileId } = req.params;
-    const { selectedCountryIndex } = req.body;
+    const { selectedCountryIndex }: RecommendCitiesRequestDto = req.body;
 
     const result = await createCityRecommendations({
       userId: req.user!.id,
