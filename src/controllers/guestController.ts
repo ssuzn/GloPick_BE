@@ -9,6 +9,7 @@ import {
 } from "../services/countryRecommendationService";
 import { asyncHandler } from "../utils/asyncHandler";
 import { SUPPORTED_LANGUAGES, JOB_FIELDS } from "../constants/dropdownOptions";
+import { BadRequestError } from "../errors/BadRequestError";
 
 // 비회원 국가 추천 요청 처리 (회원과 동일한 로직, DB 저장 없음)
 export const getGuestCountryRecommendations = asyncHandler(
@@ -17,13 +18,7 @@ export const getGuestCountryRecommendations = asyncHandler(
 
     // OECD Better Life Index 가중치 검증
     if (!qualityOfLifeWeights) {
-      return res.status(400).json({
-        success: false,
-        message: "삶의 질 지표별 가중치가 필요합니다.",
-        data: {
-          required: ["income", "jobs", "health", "lifeSatisfaction", "safety"],
-        },
-      });
+      return new BadRequestError("삶의 질 지표별 가중치가 필요합니다.");
     }
 
     // 사용자가 입력한 가중치를 그대로 사용
@@ -38,17 +33,12 @@ export const getGuestCountryRecommendations = asyncHandler(
     // 삶의 질 가중치 검증 (합계 100)
     const qualityTotal = Object.values(finalQualityWeights).reduce(
       (sum, val) => sum + val,
-      0
+      0,
     );
     if (qualityTotal !== 100) {
-      return res.status(400).json({
-        success: false,
-        message: "삶의 질 지표별 가중치의 합이 100이어야 합니다.",
-        data: {
-          currentTotal: qualityTotal,
-          weights: finalQualityWeights,
-        },
-      });
+      throw new BadRequestError(
+        "삶의 질 지표별 가중치의 합이 100이어야 합니다.",
+      );
     }
 
     // 전체 추천 가중치 기본값 설정 및 검증
@@ -64,14 +54,9 @@ export const getGuestCountryRecommendations = asyncHandler(
       finalWeights.jobWeight +
       finalWeights.qualityOfLifeWeight;
     if (totalWeight !== 100) {
-      return res.status(400).json({
-        success: false,
-        message: "전체 추천 가중치의 합이 100이어야 합니다.",
-        data: {
-          currentTotal: totalWeight,
-          weights: finalWeights,
-        },
-      });
+      throw new BadRequestError(
+        "직무, 언어, QOL 가중치의 합이 100이어야 합니다.",
+      );
     }
 
     const userProfile: CountryRecommendationProfile = {
@@ -89,10 +74,7 @@ export const getGuestCountryRecommendations = asyncHandler(
     // 입력 데이터 검증
     const validationError = validateGuestProfile(userProfile);
     if (validationError) {
-      return res.status(400).json({
-        success: false,
-        message: validationError,
-      });
+      throw new BadRequestError(validationError);
     }
 
     console.log("비회원 국가 추천 요청:", {
@@ -102,50 +84,42 @@ export const getGuestCountryRecommendations = asyncHandler(
       weights: finalWeights,
     });
 
-    try {
-      // 가중치를 서비스에서 사용할 수 있도록 저장
-      saveWeights({
-        language: finalWeights.languageWeight,
-        job: finalWeights.jobWeight,
-        qualityOfLife: finalWeights.qualityOfLifeWeight,
-      });
+    // 가중치를 서비스에서 사용할 수 있도록 저장
+    saveWeights({
+      language: finalWeights.languageWeight,
+      job: finalWeights.jobWeight,
+      qualityOfLife: finalWeights.qualityOfLifeWeight,
+    });
 
-      // 국가 추천 서비스 호출 (회원과 동일한 로직)
-      const recommendations: CountryRecommendation[] =
-        await CountryRecommendationService.getTopCountryRecommendations(
-          userProfile
-        );
+    // 국가 추천 서비스 호출 (회원과 동일한 로직)
+    const recommendations: CountryRecommendation[] =
+      await CountryRecommendationService.getTopCountryRecommendations(
+        userProfile,
+      );
 
-      res.status(200).json({
-        success: true,
-        message: "비회원 국가 추천이 완료되었습니다.",
-        data: {
-          userProfile: {
-            language: userProfile.language,
-            desiredJob,
-            qualityOfLifeWeights: userProfile.qualityOfLifeWeights,
-            weights: finalWeights,
-          },
-          recommendations,
-          appliedWeights: finalWeights,
-          timestamp: new Date().toISOString(),
-          note: "비회원은 국가 추천까지만 제공됩니다. 시뮬레이션 기능을 이용하려면 회원가입이 필요합니다.",
+    res.status(200).json({
+      success: true,
+      message: "비회원 국가 추천이 완료되었습니다.",
+      data: {
+        userProfile: {
+          language: userProfile.language,
+          desiredJob,
+          qualityOfLifeWeights: userProfile.qualityOfLifeWeights,
+          weights: finalWeights,
         },
-      });
-    } catch (error) {
-      console.error("비회원 국가 추천 처리 오류:", error);
-
-      res.status(500).json({
-        success: false,
-        message: "국가 추천 처리 중 서버 오류가 발생했습니다.",
-        error: process.env.NODE_ENV === "development" ? error : undefined,
-      });
-    }
-  }
+        recommendations,
+        appliedWeights: finalWeights,
+        timestamp: new Date().toISOString(),
+        note: "비회원은 국가 추천까지만 제공됩니다. 시뮬레이션 기능을 이용하려면 회원가입이 필요합니다.",
+      },
+    });
+  },
 );
 
 // 비회원 프로필 검증 함수 (회원과 동일한 검증)
-function validateGuestProfile(profile: CountryRecommendationProfile): string | null {
+function validateGuestProfile(
+  profile: CountryRecommendationProfile,
+): string | null {
   // 필수 필드 검증
   if (!profile.language || profile.language.trim() === "") {
     return "사용 가능한 언어를 선택해주세요.";

@@ -3,18 +3,16 @@ import bcrypt from "bcrypt";
 import axios from "axios";
 import { prisma } from '../db';
 import { generateToken } from "../utils/generateToken";
+import { BadRequestError } from "../errors/BadRequestError";
+import { UnauthorizedError } from "../errors/UnauthorizedError";
+import { ConflictError } from "../errors/ConflictError";
 
 // 회원가입
 export const register = async (req: Request, res: Response) => {
-  try {
     const { name, email, password, passwordConfirm, birth, phone } = req.body;
 
     if (password !== passwordConfirm) {
-      return res.status(400).json({
-        code: 400,
-        message: "비밀번호가 일치하지 않습니다.",
-        data: null,
-      });
+      throw new BadRequestError("비밀번호가 일치하지 않습니다.");
     }
 
     const existingUser = await prisma.user.findUnique({ 
@@ -22,11 +20,7 @@ export const register = async (req: Request, res: Response) => {
     });
 
     if (existingUser) {
-      return res.status(400).json({
-        code: 400,
-        message: "이미 존재하는 이메일입니다.",
-        data: null,
-      });
+      throw new BadRequestError("이미 존재하는 이메일입니다.");
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -43,10 +37,6 @@ export const register = async (req: Request, res: Response) => {
     });
 
     res.status(201).json({ code: 201, message: "회원가입 성공!", data: null });
-  } catch (error) {
-    console.error("회원가입 오류:", error);
-    res.status(500).json({ code: 500, message: "서버 오류", data: null });
-  }
 };
 
 // 로그인
@@ -58,29 +48,17 @@ export const login = async (req: Request, res: Response) => {
    });
 
   if (!user) {
-    return res.status(401).json({
-      code: 401,
-      message: "이메일이 존재하지 않습니다.",
-      data: null,
-    });
+    throw new UnauthorizedError("사용자를 찾을 수 없습니다. 이메일을 확인해주세요.");
   }
 
   // 카카오 로그인 사용자 체크
   if (!user.password) {
-    return res.status(401).json({
-      code: 401,
-      message: "카카오 로그인 사용자입니다. 카카오 로그인을 이용해주세요.",
-      data: null,
-    });
+    throw new UnauthorizedError("카카오 로그인 사용자입니다. 일반 로그인을 이용해주세요.");
   }
 
   const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch) {
-    return res.status(401).json({
-      code: 401,
-      message: "비밀번호가 틀렸습니다.",
-      data: null,
-    });
+    throw new UnauthorizedError("비밀번호가 틀렸습니다.");
   }
 
   const token = generateToken(user.id.toString());
@@ -111,15 +89,10 @@ export const getKakaoAuthUrl = (req: Request, res: Response) => {
 
 // 카카오 로그인 - 콜백 처리
 export const kakaoCallback = async (req: Request, res: Response) => {
-  try {
     const { code } = req.query;
 
     if (!code) {
-      return res.status(400).json({
-        code: 400,
-        message: "인가 코드가 없습니다.",
-        data: null,
-      });
+      throw new BadRequestError("인가 코드가 없습니다.");
     }
 
     // 1. 액세스 토큰 받기
@@ -159,11 +132,7 @@ export const kakaoCallback = async (req: Request, res: Response) => {
     const birthyear = kakaoUser.kakao_account?.birthyear; // YYYY 형식
 
     if (!email) {
-      return res.status(400).json({
-        code: 400,
-        message: "카카오 계정에서 이메일을 가져올 수 없습니다.",
-        data: null,
-      });
+      throw new BadRequestError("카카오 계정에 이메일 정보가 없습니다. 이메일 제공 동의가 필요합니다.");
     }
 
     // 3. 사용자 확인 또는 생성
@@ -181,12 +150,7 @@ export const kakaoCallback = async (req: Request, res: Response) => {
         // 기존 일반 회원가입 사용자가 있는 경우
         if (existingUser.provider === "local" && !existingUser.kakaoId) {
           // 일반 회원가입 계정이 이미 존재 - 보안상 연동 차단
-          return res.status(409).json({
-            code: 409,
-            message:
-              "이미 해당 이메일로 가입된 계정이 있습니다. 일반 로그인을 이용해주세요.",
-            data: null,
-          });
+          throw new ConflictError("이미 해당 이메일로 가입된 계정이 있습니다. 일반 로그인을 이용해주세요.");
         }
         // 이미 카카오 정보가 있는 경우 (정상 케이스)
         user = existingUser;
@@ -219,8 +183,4 @@ export const kakaoCallback = async (req: Request, res: Response) => {
         user.name
       )}&email=${encodeURIComponent(user.email)}`
     );
-  } catch (error) {
-    console.error("카카오 로그인 오류:", error);
-    res.redirect(`${process.env.FRONTEND_URL}/login?error=kakao`);
-  }
 };

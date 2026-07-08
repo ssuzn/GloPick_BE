@@ -7,6 +7,7 @@ import {
   QUALITY_OF_LIFE_INDICATORS,
 } from "../constants/dropdownOptions";
 import { DesiredJob, Language } from "../generated/prisma/client";
+import { BadRequestError } from "../errors/BadRequestError";
 
 const toDesiredJobEnum = (desiredJob: string): DesiredJob => {
   return `JOB_${desiredJob}` as DesiredJob;
@@ -28,13 +29,7 @@ export const createProfile = async (req: AuthRequest, res: Response) => {
   } = req.body;
 
   if (!qualityOfLifeWeights) {
-    return res.status(400).json({
-      code: 400,
-      message: "삶의 질 지표별 가중치가 필요합니다.",
-      data: {
-        required: ["income", "jobs", "health", "lifeSatisfaction", "safety"],
-      },
-    });
+    throw new BadRequestError("삶의 질 지표별 가중치가 필요합니다.");
   }
 
   const finalQualityWeights = {
@@ -47,18 +42,11 @@ export const createProfile = async (req: AuthRequest, res: Response) => {
 
   const qualityTotal = Object.values(finalQualityWeights).reduce(
     (sum, val) => sum + val,
-    0
+    0,
   );
 
   if (qualityTotal !== 100) {
-    return res.status(400).json({
-      code: 400,
-      message: "삶의 질 지표별 가중치의 합이 100이어야 합니다.",
-      data: {
-        currentTotal: qualityTotal,
-        weights: finalQualityWeights,
-      },
-    });
+    throw new BadRequestError("삶의 질 지표별 가중치의 합이 100이어야 합니다.");
   }
 
   if (
@@ -66,13 +54,7 @@ export const createProfile = async (req: AuthRequest, res: Response) => {
     typeof jobWeight !== "number" ||
     typeof qualityOfLifeWeight !== "number"
   ) {
-    return res.status(400).json({
-      code: 400,
-      message: "직무, 언어, QOL 가중치가 필요합니다.",
-      data: {
-        required: ["languageWeight", "jobWeight", "qualityOfLifeWeight"],
-      },
-    });
+    throw new BadRequestError("직무, 언어, QOL 가중치가 모두 숫자여야 합니다.");
   }
 
   const finalWeights = {
@@ -84,14 +66,9 @@ export const createProfile = async (req: AuthRequest, res: Response) => {
   const totalWeight = languageWeight + jobWeight + qualityOfLifeWeight;
 
   if (totalWeight !== 100) {
-    return res.status(400).json({
-      code: 400,
-      message: "직무, 언어, QOL 가중치의 합이 100이어야 합니다.",
-      data: {
-        currentTotal: totalWeight,
-        weights: finalWeights,
-      },
-    });
+    throw new BadRequestError(
+      "직무, 언어, QOL 가중치의 합이 100이어야 합니다.",
+    );
   }
 
   const prismaDesiredJob = toDesiredJobEnum(desiredJob);
@@ -119,13 +96,9 @@ export const createProfile = async (req: AuthRequest, res: Response) => {
   });
 
   if (isDuplicate) {
-    return res.status(400).json({
-      code: 400,
-      message: "이전 이력과 내용이 동일합니다. 등록이 불가합니다.",
-      data: {
-        profileId: isDuplicate.id,
-      },
-    });
+    throw new BadRequestError(
+      "이전 이력과 내용이 동일합니다. 등록이 불가합니다.",
+    );
   }
 
   const profile = await prisma.userProfile.create({
@@ -157,23 +130,15 @@ export const createProfile = async (req: AuthRequest, res: Response) => {
 
 // 드롭다운 옵션 조회 (GET /api/profile/options)
 export const getProfileOptions = async (req: Request, res: Response) => {
-  try {
-    const options = {
-      languages: SUPPORTED_LANGUAGES,
-      jobFields: JOB_FIELDS,
-      qualityOfLifeIndicators: QUALITY_OF_LIFE_INDICATORS,
-    };
+  const options = {
+    languages: SUPPORTED_LANGUAGES,
+    jobFields: JOB_FIELDS,
+    qualityOfLifeIndicators: QUALITY_OF_LIFE_INDICATORS,
+  };
 
-    res.status(200).json({
-      code: 200,
-      message: "드롭다운 옵션 조회 성공",
-      data: options,
-    });
-  } catch (error) {
-    res.status(500).json({
-      code: 500,
-      message: "서버 오류",
-      data: null,
-    });
-  }
+  res.status(200).json({
+    code: 200,
+    message: "드롭다운 옵션 조회 성공",
+    data: options,
+  });
 };
