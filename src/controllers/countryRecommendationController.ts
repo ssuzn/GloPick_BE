@@ -12,6 +12,10 @@ import { AuthRequest } from "../middlewares/authMiddleware";
 import { JOB_FIELDS } from "../constants/dropdownOptions";
 import { oecdService } from "../services/oecdService";
 import { prisma } from "../db";
+import { BadRequestError } from "../errors/BadRequestError";
+import { ConflictError } from "../errors/ConflictError";
+import { UnauthorizedError } from "../errors/UnauthorizedError";
+import { NotFoundError } from "../errors/NotFoundError";
 
 function normalizeLanguage(language: string): string {
   const languageMap: Record<string, string> = {
@@ -53,11 +57,11 @@ function toJobCode(desiredJob: string): string {
 
 async function validateUserAndProfile(req: AuthRequest, profileId: string) {
   if (!req.user) {
-    throw { status: 401, message: "인증이 필요합니다." };
+    throw new UnauthorizedError("사용자 인증이 필요합니다.");
   }
 
   if (!profileId) {
-    throw { status: 400, message: "프로필 ID가 필요합니다." };
+    throw new BadRequestError("프로필 ID가 필요합니다.");
   }
 
   const dbProfile = await prisma.userProfile.findFirst({
@@ -68,7 +72,7 @@ async function validateUserAndProfile(req: AuthRequest, profileId: string) {
   });
 
   if (!dbProfile) {
-    throw { status: 404, message: "프로필을 찾을 수 없습니다." };
+    throw new NotFoundError("사용자 프로필을 찾을 수 없습니다.");
   }
 
   return dbProfile;
@@ -78,7 +82,7 @@ async function saveRecommendation(
   userId: number,
   profileId: number,
   recommendations: CountryRecommendation[],
-  weights: { language: number; job: number; qualityOfLife: number }
+  weights: { language: number; job: number; qualityOfLife: number },
 ) {
   const savedResult = await prisma.countryRecommendationResult.create({
     data: {
@@ -91,7 +95,7 @@ async function saveRecommendation(
         create: await Promise.all(
           recommendations.map(async (rec, index) => {
             const oecdData = await oecdService.getCountryBetterLifeData(
-              rec.country.name
+              rec.country.name,
             );
 
             return {
@@ -114,7 +118,7 @@ async function saveRecommendation(
               population: rec.country.population ?? 0,
               employmentRate: rec.country.employmentRate ?? null,
             };
-          })
+          }),
         ),
       },
     },
@@ -128,130 +132,96 @@ export const getCountryRecommendations = asyncHandler(
     const authReq = req as AuthRequest;
     const profileId = req.params.profileId;
 
-    try {
-      if (!profileId) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "프로필 ID가 필요합니다. 게스트 사용자는 /api/guest/recommend를 사용하세요.",
-        });
-      }
+    if (!profileId) {
+      throw new BadRequestError("프로필 ID가 필요합니다.");
+    }
 
-      const dbProfile = await validateUserAndProfile(authReq, profileId);
+    const dbProfile = await validateUserAndProfile(authReq, profileId);
 
-      const weights = {
-        language: dbProfile.languageWeight,
-        job: dbProfile.jobWeight,
-        qualityOfLife: dbProfile.qualityOfLifeWeight,
-      };
+    const weights = {
+      language: dbProfile.languageWeight,
+      job: dbProfile.jobWeight,
+      qualityOfLife: dbProfile.qualityOfLifeWeight,
+    };
 
-      const qualityOfLifeWeights = {
-        income: dbProfile.incomeWeight,
-        jobs: dbProfile.jobsWeight,
-        health: dbProfile.healthWeight,
-        lifeSatisfaction: dbProfile.lifeSatisfactionWeight,
-        safety: dbProfile.safetyWeight,
-      };
+    const qualityOfLifeWeights = {
+      income: dbProfile.incomeWeight,
+      jobs: dbProfile.jobsWeight,
+      health: dbProfile.healthWeight,
+      lifeSatisfaction: dbProfile.lifeSatisfactionWeight,
+      safety: dbProfile.safetyWeight,
+    };
 
-      const jobCode = toJobCode(dbProfile.desiredJob);
-      const jobField =
-        JOB_FIELDS.find((field) => field.code === jobCode) || JOB_FIELDS[1];
+    const jobCode = toJobCode(dbProfile.desiredJob);
+    const jobField =
+      JOB_FIELDS.find((field) => field.code === jobCode) || JOB_FIELDS[1];
 
-      const userProfile: CountryRecommendationProfile = {
-        language: normalizeLanguage(dbProfile.language),
-        jobField: {
-          code: jobField.code,
-          nameKo: jobField.nameKo,
-          nameEn: jobField.nameEn,
+    const userProfile: CountryRecommendationProfile = {
+      language: normalizeLanguage(dbProfile.language),
+      jobField: {
+        code: jobField.code,
+        nameKo: jobField.nameKo,
+        nameEn: jobField.nameEn,
+      },
+      qualityOfLifeWeights,
+    };
+
+    const existingRecommendation =
+      await prisma.countryRecommendationResult.findFirst({
+        where: {
+          userId: authReq.user!.id,
+          profileId: Number(profileId),
+          languageWeight: weights.language,
+          jobWeight: weights.job,
+          qualityOfLifeWeight: weights.qualityOfLife,
         },
-        qualityOfLifeWeights,
-      };
-
-      const existingRecommendation =
-        await prisma.countryRecommendationResult.findFirst({
-          where: {
-            userId: authReq.user!.id,
-            profileId: Number(profileId),
-            languageWeight: weights.language,
-            jobWeight: weights.job,
-            qualityOfLifeWeight: weights.qualityOfLife,
-          },
-          orderBy: {
-            createdAt: "desc",
-          },
-          include: {
-            recommendations: {
-              orderBy: {
-                rank: "asc",
-              },
+        orderBy: {
+          createdAt: "desc",
+        },
+        include: {
+          recommendations: {
+            orderBy: {
+              rank: "asc",
             },
           },
-        });
-
-      if (existingRecommendation) {
-        return res.status(409).json({
-          success: false,
-          message: "이미 동일한 이력으로 추천을 받았습니다.",
-          data: {
-            isExisting: true,
-            recommendationId: existingRecommendation.id,
-            profileId,
-            createdAt: existingRecommendation.createdAt,
-            recommendations: existingRecommendation.recommendations,
-          },
-        });
-      }
-
-      saveWeights(weights);
-
-      const recommendations =
-        await CountryRecommendationService.getTopCountryRecommendations(
-          userProfile
-        );
-
-      const savedRecommendationId = await saveRecommendation(
-        authReq.user!.id,
-        Number(profileId),
-        recommendations,
-        weights
-      );
-
-      return res.status(200).json({
-        success: true,
-        message: "국가 추천이 완료되고 저장되었습니다.",
-        data: {
-          isExisting: false,
-          recommendationId: savedRecommendationId,
-          profileId,
-          userProfile,
-          recommendations,
-          appliedWeights: {
-            language: weights.language / 100,
-            job: weights.job / 100,
-            qualityOfLife: weights.qualityOfLife / 100,
-          },
-          qualityOfLifeWeights,
-          timestamp: new Date().toISOString(),
         },
       });
-    } catch (error) {
-      if ((error as any).status) {
-        return res.status((error as any).status).json({
-          success: false,
-          message: (error as any).message,
-        });
-      }
 
-      console.error("국가 추천 처리 오류:", error);
-
-      return res.status(500).json({
-        success: false,
-        message: "국가 추천 처리 중 서버 오류가 발생했습니다.",
-        error:
-          process.env.NODE_ENV === "development"
-            ? (error as any).message
-            : undefined,
-      });
+    if (existingRecommendation) {
+      throw new ConflictError("이미 존재하는 추천 결과입니다.");
     }
-  }
+
+    saveWeights(weights);
+
+    const recommendations =
+      await CountryRecommendationService.getTopCountryRecommendations(
+        userProfile,
+      );
+
+    const savedRecommendationId = await saveRecommendation(
+      authReq.user!.id,
+      Number(profileId),
+      recommendations,
+      weights,
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "국가 추천이 완료되고 저장되었습니다.",
+      data: {
+        isExisting: false,
+        recommendationId: savedRecommendationId,
+        profileId,
+        userProfile,
+        recommendations,
+        appliedWeights: {
+          language: weights.language / 100,
+          job: weights.job / 100,
+          qualityOfLife: weights.qualityOfLife / 100,
+        },
+        qualityOfLifeWeights,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  },
 );

@@ -2,6 +2,8 @@ import { Response } from "express";
 import bcrypt from "bcrypt";
 import { prisma } from "../db";
 import { AuthRequest } from "../middlewares/authMiddleware";
+import { NotFoundError } from "../errors/NotFoundError";
+import { ConflictError } from "../errors/ConflictError";
 
 const toJobCode = (desiredJob: string) => desiredJob.replace("JOB_", "");
 
@@ -115,138 +117,106 @@ const formatRecommendationResult = (rec: any) => ({
 });
 
 export const getUserInfo = async (req: AuthRequest, res: Response) => {
-  try {
-    if (!req.user) {
-      return res.status(404).json({
-        code: 404,
-        message: "사용자를 찾을 수 없음",
-        data: null,
-      });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { id: req.user.id },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        birth: true,
-        phone: true,
-      },
-    });
-
-    if (!user) {
-      return res.status(404).json({
-        code: 404,
-        message: "사용자를 찾을 수 없음",
-        data: null,
-      });
-    }
-
-    return res.status(200).json({
-      code: 200,
-      message: "사용자 정보 조회 성공",
-      data: {
-        userId: user.id,
-        name: user.name,
-        email: user.email,
-        birth: user.birth,
-        phone: user.phone,
-      },
-    });
-  } catch (error) {
-    return res.status(500).json({ code: 500, message: "서버 오류", data: null });
+  if (!req.user) {
+    throw new NotFoundError("사용자 정보가 존재하지 않습니다.");
   }
+
+  const user = await prisma.user.findUnique({
+    where: { id: req.user.id },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      birth: true,
+      phone: true,
+    },
+  });
+
+  if (!user) {
+    throw new NotFoundError("사용자 정보가 존재하지 않습니다.");
+  }
+
+  return res.status(200).json({
+    code: 200,
+    message: "사용자 정보 조회 성공",
+    data: {
+      userId: user.id,
+      name: user.name,
+      email: user.email,
+      birth: user.birth,
+      phone: user.phone,
+    },
+  });
 };
 
 export const updateUserInfo = async (req: AuthRequest, res: Response) => {
-  try {
-    const { name, email, password, birth, phone } = req.body;
+  const { name, email, password, birth, phone } = req.body;
 
-    const user = await prisma.user.findUnique({
-      where: { id: req.user!.id },
-    });
+  const user = await prisma.user.findUnique({
+    where: { id: req.user!.id },
+  });
 
-    if (!user) {
-      return res.status(404).json({
-        code: 404,
-        message: "사용자를 찾을 수 없음",
-        data: null,
-      });
-    }
-
-    if (email && email !== user.email) {
-      const existingUser = await prisma.user.findUnique({
-        where: { email },
-      });
-
-      if (existingUser) {
-        return res.status(409).json({
-          code: 409,
-          message: "이미 사용 중인 이메일입니다.",
-          data: null,
-        });
-      }
-    }
-
-    const hashedPassword =
-      typeof password === "string" && password.trim() !== ""
-        ? await bcrypt.hash(password.trim(), 10)
-        : undefined;
-
-    const updatedUser = await prisma.user.update({
-      where: { id: req.user!.id },
-      data: {
-        ...(name && { name }),
-        ...(email && { email }),
-        ...(birth && { birth }),
-        ...(phone && { phone }),
-        ...(hashedPassword && { password: hashedPassword }),
-      },
-    });
-
-    return res.status(200).json({
-      code: 200,
-      message: "사용자 정보 수정 성공",
-      data: {
-        userId: updatedUser.id,
-        name: updatedUser.name,
-        email: updatedUser.email,
-        birth: updatedUser.birth,
-        phone: updatedUser.phone,
-      },
-    });
-  } catch (error) {
-    return res.status(500).json({ code: 500, message: "서버 오류", data: null });
+  if (!user) {
+    throw new NotFoundError("사용자 정보가 존재하지 않습니다.");
   }
+
+  if (email && email !== user.email) {
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (existingUser) {
+      throw new ConflictError("이미 사용 중인 이메일입니다.");
+    }
+  }
+
+  const hashedPassword =
+    typeof password === "string" && password.trim() !== ""
+      ? await bcrypt.hash(password.trim(), 10)
+      : undefined;
+
+  const updatedUser = await prisma.user.update({
+    where: { id: req.user!.id },
+    data: {
+      ...(name && { name }),
+      ...(email && { email }),
+      ...(birth && { birth }),
+      ...(phone && { phone }),
+      ...(hashedPassword && { password: hashedPassword }),
+    },
+  });
+
+  return res.status(200).json({
+    code: 200,
+    message: "사용자 정보 수정 성공",
+    data: {
+      userId: updatedUser.id,
+      name: updatedUser.name,
+      email: updatedUser.email,
+      birth: updatedUser.birth,
+      phone: updatedUser.phone,
+    },
+  });
 };
 
 export const deleteUser = async (req: AuthRequest, res: Response) => {
-  try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.user!.id },
-    });
+  const user = await prisma.user.findUnique({
+    where: { id: req.user!.id },
+  });
 
-    if (!user) {
-      return res.status(404).json({
-        code: 404,
-        message: "사용자를 찾을 수 없음",
-        data: null,
-      });
-    }
-
-    await prisma.user.delete({
-      where: { id: req.user!.id },
-    });
-
-    return res.status(200).json({
-      code: 200,
-      message: "회원 탈퇴 완료!",
-      data: null,
-    });
-  } catch (error) {
-    return res.status(500).json({ code: 500, message: "서버 오류", data: null });
+  if (!user) {
+    throw new NotFoundError("사용자 정보가 존재하지 않습니다.");
   }
+
+  await prisma.user.delete({
+    where: { id: req.user!.id },
+  });
+
+  return res.status(200).json({
+    code: 200,
+    message: "회원 탈퇴 완료!",
+    data: null,
+  });
 };
 
 export const getProfile = async (req: AuthRequest, res: Response) => {
@@ -256,11 +226,7 @@ export const getProfile = async (req: AuthRequest, res: Response) => {
   });
 
   if (profiles.length === 0) {
-    return res.status(404).json({
-      code: 404,
-      message: "이력 정보가 없습니다.",
-      data: null,
-    });
+    throw new NotFoundError("사용자 이력 정보가 존재하지 않습니다.");
   }
 
   return res.status(200).json({
@@ -281,11 +247,7 @@ export const updateProfile = async (req: AuthRequest, res: Response) => {
   });
 
   if (!profile) {
-    return res.status(404).json({
-      code: 404,
-      message: "이력을 찾을 수 없습니다.",
-      data: null,
-    });
+    throw new NotFoundError("이력을 찾을 수 없습니다.");
   }
 
   const { language, desiredJob, qualityOfLifeWeights, weights } = req.body;
@@ -328,11 +290,7 @@ export const deleteProfile = async (req: AuthRequest, res: Response) => {
   });
 
   if (!profile) {
-    return res.status(404).json({
-      code: 404,
-      message: "이력을 찾을 수 없습니다.",
-      data: null,
-    });
+    throw new NotFoundError("이력을 찾을 수 없습니다.");
   }
 
   await prisma.userProfile.delete({
@@ -347,156 +305,104 @@ export const deleteProfile = async (req: AuthRequest, res: Response) => {
 };
 
 export const getUserSimulations = async (req: AuthRequest, res: Response) => {
-  try {
-    const simulations = await prisma.simulationResult.findMany({
-      where: { userId: req.user!.id },
-      include: { input: true },
-      orderBy: { createdAt: "desc" },
-    });
+  const simulations = await prisma.simulationResult.findMany({
+    where: { userId: req.user!.id },
+    include: { input: true },
+    orderBy: { createdAt: "desc" },
+  });
 
-    if (simulations.length === 0) {
-      return res.status(404).json({
-        code: 404,
-        message: "시뮬레이션 결과가 없습니다.",
-        data: null,
-      });
-    }
-
-    return res.status(200).json({
-      code: 200,
-      message: "시뮬레이션 결과 조회 성공",
-      data: simulations.map(formatSimulationResult),
-    });
-  } catch (error) {
-    console.error("시뮬레이션 결과 조회 실패:", error);
-    return res.status(500).json({
-      code: 500,
-      message: "서버 오류",
-      data: null,
-    });
+  if (simulations.length === 0) {
+    throw new NotFoundError("저장된 시뮬레이션 결과가 없습니다.");
   }
+
+  return res.status(200).json({
+    code: 200,
+    message: "시뮬레이션 결과 조회 성공",
+    data: simulations.map(formatSimulationResult),
+  });
 };
 
 export const getUserRecommendations = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ) => {
-  try {
-    const recommendations = await prisma.countryRecommendationResult.findMany({
-      where: { userId: req.user!.id },
-      include: {
-        profile: true,
-        recommendations: {
-          orderBy: { rank: "asc" },
-        },
+  const recommendations = await prisma.countryRecommendationResult.findMany({
+    where: { userId: req.user!.id },
+    include: {
+      profile: true,
+      recommendations: {
+        orderBy: { rank: "asc" },
       },
-      orderBy: { createdAt: "desc" },
-    });
+    },
+    orderBy: { createdAt: "desc" },
+  });
 
-    if (recommendations.length === 0) {
-      return res.status(404).json({
-        code: 404,
-        message: "저장된 추천 결과가 없습니다.",
-        data: null,
-      });
-    }
-
-    return res.status(200).json({
-      code: 200,
-      message: "추천 결과 조회 성공",
-      data: recommendations.map(formatRecommendationResult),
-    });
-  } catch (error) {
-    console.error("추천 결과 조회 실패:", error);
-    return res.status(500).json({
-      code: 500,
-      message: "서버 오류",
-      data: null,
-    });
+  if (recommendations.length === 0) {
+    throw new NotFoundError("저장된 추천 결과가 없습니다.");
   }
+
+  return res.status(200).json({
+    code: 200,
+    message: "추천 결과 조회 성공",
+    data: recommendations.map(formatRecommendationResult),
+  });
 };
 
 export const getRecommendationsByProfileId = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ) => {
   const { profileId } = req.params;
 
-  try {
-    const recommendations = await prisma.countryRecommendationResult.findMany({
-      where: {
-        userId: req.user!.id,
-        profileId: Number(profileId),
+  const recommendations = await prisma.countryRecommendationResult.findMany({
+    where: {
+      userId: req.user!.id,
+      profileId: Number(profileId),
+    },
+    include: {
+      profile: true,
+      recommendations: {
+        orderBy: { rank: "asc" },
       },
-      include: {
-        profile: true,
-        recommendations: {
-          orderBy: { rank: "asc" },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    },
+    orderBy: { createdAt: "desc" },
+  });
 
-    if (recommendations.length === 0) {
-      return res.status(404).json({
-        code: 404,
-        message: "해당 이력에 대한 추천 결과가 없습니다.",
-        data: null,
-      });
-    }
-
-    return res.status(200).json({
-      code: 200,
-      message: "추천 결과 조회 성공",
-      data: recommendations.map(formatRecommendationResult),
-    });
-  } catch (error) {
-    console.error("특정 이력 추천 결과 조회 실패:", error);
-    return res.status(500).json({
-      code: 500,
-      message: "서버 오류",
-      data: null,
-    });
+  if (recommendations.length === 0) {
+    throw new NotFoundError("해당 이력에 대한 추천 결과가 없습니다.");
   }
+
+  return res.status(200).json({
+    code: 200,
+    message: "추천 결과 조회 성공",
+    data: recommendations.map(formatRecommendationResult),
+  });
 };
 
 export const getSimulationsByProfileId = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ) => {
   const { profileId } = req.params;
 
-  try {
-    const simulations = await prisma.simulationResult.findMany({
-      where: {
-        userId: req.user!.id,
-        input: {
-          profileId: Number(profileId),
-        },
+  const simulations = await prisma.simulationResult.findMany({
+    where: {
+      userId: req.user!.id,
+      input: {
+        profileId: Number(profileId),
       },
-      include: { input: true },
-      orderBy: { createdAt: "desc" },
-    });
+    },
+    include: { input: true },
+    orderBy: { createdAt: "desc" },
+  });
 
-    if (simulations.length === 0) {
-      return res.status(404).json({
-        code: 404,
-        message: "해당 이력에 대한 시뮬레이션 결과가 없습니다.",
-        data: null,
-      });
-    }
-
-    return res.status(200).json({
-      code: 200,
-      message: "시뮬레이션 결과 조회 성공",
-      data: simulations.map(formatSimulationResult),
-    });
-  } catch (error) {
-    console.error("시뮬레이션 결과 조회 실패:", error);
-    return res.status(500).json({
-      code: 500,
-      message: "서버 오류",
-      data: null,
-    });
+  if (simulations.length === 0) {
+    throw new NotFoundError("해당 이력에 대한 시뮬레이션 결과가 없습니다.");
   }
+
+  return res.status(200).json({
+    code: 200,
+    message: "시뮬레이션 결과 조회 성공",
+    data: simulations.map(formatSimulationResult),
+  });
 };
