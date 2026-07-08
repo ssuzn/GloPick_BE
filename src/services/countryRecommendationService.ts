@@ -1,83 +1,157 @@
+import { JOB_FIELDS } from "../constants/dropdownOptions";
+import { prisma } from "../db";
+import { BadRequestError } from "../errors/BadRequestError";
+import { ConflictError } from "../errors/ConflictError";
+import { NotFoundError } from "../errors/NotFoundError";
+import { UserProfile } from "../generated/prisma/client";
+import { RecommendationMapper } from "../mappers/RecommendationMapper";
 import {
   CountryData,
   ScoredCountry,
   CountryRecommendation,
   CountryRecommendationProfile,
+  ISCOJobField,
+  QualityOfLifeWeights,
+  RecommendationWeights,
 } from "../types/countryRecommendation";
 import { ExternalAPIService } from "./externalAPIService";
 import { oecdService } from "./oecdService";
 
-interface Weights {
-  language: number;
-  job: number;
-  qualityOfLife: number;
-}
-
-let userWeights: Weights = { language: 0, job: 0, qualityOfLife: 0 };
-
-export const saveWeights = (weights: Weights) => {
-  userWeights = weights;
-  console.log("Weights saved:", userWeights);
-};
-
-export const getWeights = () => userWeights;
-
 export class CountryRecommendationService {
+  static async createRecommendation(userId: number, profileId: number) {
+    if (Number.isNaN(profileId)) {
+      throw new BadRequestError("프로필 ID가 올바르지 않습니다.");
+    }
+
+    const dbProfile = await this.findUserProfile(userId, profileId);
+
+    const { weights, qualityOfLifeWeights, userProfile } =
+      this.buildRecommendationContext(dbProfile);
+
+    const existingRecommendation = await this.findExistingRecommendation(
+      userId,
+      profileId,
+      weights,
+    );
+
+    if (existingRecommendation) {
+      throw new ConflictError("이미 존재하는 추천 결과입니다.");
+    }
+
+    const recommendations = await this.getTopCountryRecommendations(
+      userProfile,
+      weights,
+    );
+
+    const recommendationId = await this.saveRecommendation(
+      userId,
+      profileId,
+      recommendations,
+      weights,
+    );
+
+    return RecommendationMapper.toResponse(
+      recommendationId,
+      profileId,
+      userProfile,
+      recommendations,
+      weights,
+      qualityOfLifeWeights,
+    );
+  }
+
+  private static buildRecommendationContext(dbProfile: UserProfile) {
+    const weights = {
+      language: dbProfile.languageWeight,
+      job: dbProfile.jobWeight,
+      qualityOfLife: dbProfile.qualityOfLifeWeight,
+    };
+
+    const qualityOfLifeWeights = {
+      income: dbProfile.incomeWeight,
+      jobs: dbProfile.jobsWeight,
+      health: dbProfile.healthWeight,
+      lifeSatisfaction: dbProfile.lifeSatisfactionWeight,
+      safety: dbProfile.safetyWeight,
+    };
+
+    const jobCode = this.toJobCode(dbProfile.desiredJob);
+    const jobField =
+      JOB_FIELDS.find((field) => field.code === jobCode) || JOB_FIELDS[1];
+
+    const userProfile: CountryRecommendationProfile = {
+      language: this.normalizeLanguage(dbProfile.language),
+      jobField: {
+        code: jobField.code,
+        nameKo: jobField.nameKo,
+        nameEn: jobField.nameEn,
+      },
+      qualityOfLifeWeights,
+    };
+
+    return {
+      weights,
+      qualityOfLifeWeights,
+      userProfile,
+    };
+  }
+
+  private static async findExistingRecommendation(
+    userId: number,
+    profileId: number,
+    weights: RecommendationWeights,
+  ) {
+    return prisma.countryRecommendationResult.findFirst({
+      where: {
+        userId,
+        profileId,
+        languageWeight: weights.language,
+        jobWeight: weights.job,
+        qualityOfLifeWeight: weights.qualityOfLife,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+  }
+
   // 메인 추천 로직
   static async getTopCountryRecommendations(
     userProfile: CountryRecommendationProfile,
+    weights: RecommendationWeights,
   ): Promise<CountryRecommendation[]> {
-    try {
-      console.log("국가 데이터 수집 시작...");
+    // 외부 API에서 모든 국가 데이터 수집
+    const allCountries = await ExternalAPIService.getAllCountryData();
 
-      // 1. 외부 API에서 모든 국가 데이터 수집
-      const allCountries = await ExternalAPIService.getAllCountryData();
-      console.log(`총 ${allCountries.length}개 국가 데이터 수집 완료`);
+    // 각 국가별 점수 계산
+    const scoredCountries = await this.calculateCountryScores(
+      allCountries,
+      userProfile,
+    );
 
-      // 2. 각 국가별 점수 계산
-      const scoredCountries = await this.calculateCountryScores(
-        allCountries,
-        userProfile
-      );
+    const finalWeights = {
+      language: weights.language || 30,
+      job: weights.job || 30,
+      qualityOfLife: weights.qualityOfLife || 40,
+    };
 
-      // 3. 저장된 가중치 가져오기
-      const userWeights = getWeights();
-      console.log("적용할 가중치:", userWeights);
+    // 사용자 입력 가중치 적용
+    const weightedCountries = this.applyDynamicWeights(
+      scoredCountries,
+      finalWeights,
+    );
 
-      // 가중치가 설정되지 않았다면 기본값 사용
-      const finalWeights = {
-        language: userWeights.language || 30,
-        job: userWeights.job || 30,
-        qualityOfLife: userWeights.qualityOfLife || 40,
-      };
+    // 상위 5개 국가 선별
+    const topCountries = this.selectTopCountries(weightedCountries, 5);
 
-      console.log("최종 가중치:", finalWeights);
-
-      // 4. 사용자 입력 가중치 적용
-      const weightedCountries = this.applyDynamicWeights(
-        scoredCountries,
-        finalWeights
-      );
-
-      // 5. 상위 5개 국가 선별
-      const topCountries = this.selectTopCountries(weightedCountries, 5);
-
-      // 6. 추천 결과 포맷팅
-      return this.formatRecommendations(
-        topCountries,
-        userProfile,
-        finalWeights
-      );
-    } catch (error) {
-      console.error("국가 추천 처리 중 오류:", error);
-      throw new Error("국가 추천을 처리하는 중 오류가 발생했습니다.");
-    }
+    // 추천 결과 포맷팅
+    return this.formatRecommendations(topCountries, userProfile, finalWeights);
   }
 
   // 사용자 입력 가중치 적용 로직 수정
   private static applyDynamicWeights(
     scoredCountries: ScoredCountry[],
-    weights: Weights
+    weights: RecommendationWeights,
   ): ScoredCountry[] {
     return scoredCountries.map((country) => {
       const totalScore =
@@ -92,41 +166,46 @@ export class CountryRecommendationService {
   // 각 국가별 개별 점수 계산
   private static async calculateCountryScores(
     countries: CountryData[],
-    userProfile: CountryRecommendationProfile
+    userProfile: CountryRecommendationProfile,
   ): Promise<ScoredCountry[]> {
-    const scoredCountries: ScoredCountry[] = [];
+    return Promise.all(
+      countries.map((country) =>
+        this.calculateCountryScore(country, userProfile),
+      ),
+    );
+  }
 
-    for (const country of countries) {
-      const languageScore = this.calculateLanguageScore(
-        country,
-        userProfile.language
+  private static async calculateCountryScore(
+    country: CountryData,
+    userProfile: CountryRecommendationProfile,
+  ): Promise<ScoredCountry> {
+    const languageScore = this.calculateLanguageScore(
+      country,
+      userProfile.language,
+    );
+
+    const jobScore = this.calculateJobScore(country, userProfile.jobField);
+
+    let qualityOfLifeScore = 50;
+
+    try {
+      qualityOfLifeScore = await oecdService.calculateQualityOfLifeScore(
+        country.name,
+        userProfile.qualityOfLifeWeights,
       );
-
-      const jobScore = this.calculateJobScore(country, userProfile.jobField);
-
-      // OECD Better Life Index 점수 계산
-      let qualityOfLifeScore = 50; // 기본값
-      try {
-        qualityOfLifeScore = await oecdService.calculateQualityOfLifeScore(
-          country.name,
-          userProfile.qualityOfLifeWeights
-        );
-      } catch (error) {
-        console.warn(`${country.name}의 OECD 점수 계산 실패:`, error);
-      }
-
-      scoredCountries.push({
-        country,
-        scores: {
-          languageScore,
-          jobScore,
-          qualityOfLifeScore,
-        },
-        weightedScore: 0, // 나중에 계산
-      });
+    } catch (error) {
+      console.warn(`${country.name}의 OECD 점수 계산 실패:`, error);
     }
 
-    return scoredCountries;
+    return {
+      country,
+      scores: {
+        languageScore,
+        jobScore,
+        qualityOfLifeScore,
+      },
+      weightedScore: 0,
+    };
   }
 
   // 언어 적합도 점수 계산 (0-100)
@@ -135,7 +214,7 @@ export class CountryRecommendationService {
   // 20점: 그 외 언어 (매칭 안됨)
   private static calculateLanguageScore(
     country: CountryData,
-    userLanguage: string
+    userLanguage: string,
   ): number {
     if (!country.languages || country.languages.length === 0) {
       return 20; // 언어 정보가 없는 경우 기본 점수
@@ -147,7 +226,7 @@ export class CountryRecommendationService {
     const hasMatchingLanguage = country.languages.some(
       (countryLang) =>
         countryLang.toLowerCase().includes(userLangLower) ||
-        userLangLower.includes(countryLang.toLowerCase())
+        userLangLower.includes(countryLang.toLowerCase()),
     );
 
     if (hasMatchingLanguage) {
@@ -166,8 +245,8 @@ export class CountryRecommendationService {
       majorInternationalLanguages.includes(userLangLower);
     const countryHasMajorLanguage = country.languages.some((countryLang) =>
       majorInternationalLanguages.some((majorLang) =>
-        countryLang.toLowerCase().includes(majorLang)
-      )
+        countryLang.toLowerCase().includes(majorLang),
+      ),
     );
 
     // 사용자가 주요 국제 언어를 사용하고, 국가도 주요 국제 언어를 사용하는 경우
@@ -182,7 +261,7 @@ export class CountryRecommendationService {
   // 직무 기회 점수 계산 (0-100) - 전체 고용률 50% + ISCO 직무 고용률 50%
   private static calculateJobScore(
     country: CountryData,
-    jobField: any
+    jobField: ISCOJobField,
   ): number {
     let totalScore = 0;
 
@@ -192,7 +271,7 @@ export class CountryRecommendationService {
       // 40-80% 범위를 0-100점으로 정규화
       employmentScore = Math.min(
         100,
-        Math.max(0, (country.employmentRate - 40) * 2.5)
+        Math.max(0, (country.employmentRate - 40) * 2.5),
       );
     }
     totalScore += employmentScore * 0.5;
@@ -213,7 +292,7 @@ export class CountryRecommendationService {
   // 상위 N개 국가 선별
   private static selectTopCountries(
     weightedCountries: ScoredCountry[],
-    count: number
+    count: number,
   ): ScoredCountry[] {
     return weightedCountries
       .sort((a, b) => b.weightedScore - a.weightedScore)
@@ -224,7 +303,7 @@ export class CountryRecommendationService {
   private static formatRecommendations(
     topCountries: ScoredCountry[],
     userProfile: CountryRecommendationProfile,
-    appliedWeights: Weights
+    appliedWeights: RecommendationWeights,
   ): CountryRecommendation[] {
     return topCountries.map((scored, index) => {
       const normalizedWeights = {
@@ -252,7 +331,7 @@ export class CountryRecommendationService {
   // 추천 이유 생성
   private static generateReasons(
     scored: ScoredCountry,
-    userProfile: CountryRecommendationProfile
+    userProfile: CountryRecommendationProfile,
   ): string[] {
     const reasons: string[] = [];
     const { country, scores } = scored;
@@ -260,7 +339,7 @@ export class CountryRecommendationService {
     // 언어 관련 이유
     if (scores.languageScore > 70) {
       reasons.push(
-        `사용 가능한 언어와 높은 호환성 (${Math.round(scores.languageScore)}점)`
+        `사용 가능한 언어와 높은 호환성 (${Math.round(scores.languageScore)}점)`,
       );
     } else if (scores.languageScore > 30) {
       reasons.push("영어 사용 가능 국가로 의사소통 가능");
@@ -269,7 +348,7 @@ export class CountryRecommendationService {
     // 삶의 질 관련 이유
     if (scores.qualityOfLifeScore > 80) {
       reasons.push(
-        `우수한 삶의 질 (${Math.round(scores.qualityOfLifeScore)}점)`
+        `우수한 삶의 질 (${Math.round(scores.qualityOfLifeScore)}점)`,
       );
     } else if (scores.qualityOfLifeScore > 60) {
       reasons.push("양호한 생활 환경");
@@ -292,5 +371,116 @@ export class CountryRecommendationService {
     }
 
     return reasons.length > 0 ? reasons : ["종합적인 생활 환경 고려"];
+  }
+
+  private static normalizeLanguage(language: string): string {
+    const languageMap: Record<string, string> = {
+      Korean: "korean",
+      English: "english",
+      Spanish: "spanish",
+      French: "french",
+      German: "german",
+      Portuguese: "portuguese",
+      Italian: "italian",
+      Dutch: "dutch",
+      Swedish: "swedish",
+      Norwegian: "norwegian",
+      Danish: "danish",
+      Finnish: "finnish",
+      Polish: "polish",
+      Czech: "czech",
+      Hungarian: "hungarian",
+      Greek: "greek",
+      Turkish: "turkish",
+      Japanese: "japanese",
+      Chinese: "chinese",
+      Hebrew: "hebrew",
+      Slovak: "slovak",
+      Slovene: "slovene",
+      Icelandic: "icelandic",
+      Estonian: "estonian",
+      Latvian: "latvian",
+      Lithuanian: "lithuanian",
+      Other: "english",
+    };
+
+    return languageMap[language] || "english";
+  }
+
+  private static toJobCode(desiredJob: string): string {
+    return desiredJob.replace("JOB_", "");
+  }
+
+  private static async findUserProfile(userId: number, profileId: number) {
+    const dbProfile = await prisma.userProfile.findFirst({
+      where: {
+        id: profileId,
+        userId,
+      },
+    });
+
+    if (!dbProfile) {
+      throw new NotFoundError("사용자 프로필을 찾을 수 없습니다.");
+    }
+
+    return dbProfile;
+  }
+
+  private static async buildRecommendationItems(
+    recommendations: CountryRecommendation[],
+  ) {
+    return Promise.all(
+      recommendations.map(async (rec, index) => {
+        const oecdData = await oecdService.getCountryBetterLifeData(
+          rec.country.name,
+        );
+
+        return {
+          country: rec.country.name,
+          score: rec.totalScore,
+          rank: index + 1,
+
+          languageScore: rec.breakdown.languageScore,
+          jobScore: rec.breakdown.jobScore,
+          qualityOfLifeScore: rec.breakdown.qualityOfLifeScore,
+
+          income: oecdData?.income ?? 0,
+          jobs: oecdData?.jobs ?? 0,
+          health: oecdData?.health ?? 0,
+          lifeSatisfaction: oecdData?.lifeSatisfaction ?? 0,
+          safety: oecdData?.safety ?? 0,
+
+          region: rec.country.region,
+          languages: rec.country.languages,
+          population: rec.country.population ?? 0,
+          employmentRate: rec.country.employmentRate ?? null,
+        };
+      }),
+    );
+  }
+
+  private static async saveRecommendation(
+    userId: number,
+    profileId: number,
+    recommendations: CountryRecommendation[],
+    weights: RecommendationWeights,
+  ) {
+    const recommendationItems =
+      await this.buildRecommendationItems(recommendations);
+
+    const savedResult = await prisma.countryRecommendationResult.create({
+      data: {
+        userId,
+        profileId,
+        languageWeight: weights.language,
+        jobWeight: weights.job,
+        qualityOfLifeWeight: weights.qualityOfLife,
+        recommendations: {
+          create: recommendationItems,
+        },
+      },
+    });
+
+    return savedResult.id;
   }
 }

@@ -4,16 +4,14 @@ import { prisma } from "../db";
 import { createFlightLinks } from "../utils/flightLinkGenerator";
 import { searchFacilities, getCityCenter } from "../services/googleMapsService";
 import { validateSimulationInput } from "../utils/simulationValidator";
-import {
-  findSimulationInput,
-  saveSimulation,
-} from "../services/simulationService";
 import { createCityRecommendations } from "../services/cityRecommendationService";
 import {
   recommendCitiesSchema,
   saveSimulationInputSchema,
 } from "../validators/simulation.schema";
 import { BadRequestError } from "../errors/BadRequestError";
+import { SimulationInputService } from "../services/simulation/SimulationInputService";
+import { SimulationService } from "../services/simulationService";
 
 export const saveSimulationInput = async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
@@ -32,7 +30,10 @@ export const saveSimulationInput = async (req: AuthRequest, res: Response) => {
     departureAirport,
   } = parseResult.data;
 
-  const input = await findSimulationInput(Number(id), req.user!.id);
+  const input = await SimulationInputService.findSimulationInput(
+    Number(id),
+    req.user!.id,
+  );
 
   if (!input) {
     throw new BadRequestError("입력 정보를 찾을 수 없습니다.");
@@ -60,7 +61,7 @@ export const saveSimulationInput = async (req: AuthRequest, res: Response) => {
     });
   }
 
-  const result = await saveSimulation({
+  const result = await SimulationService.saveSimulation({
     input,
     userId: req.user!.id,
     cityIndex,

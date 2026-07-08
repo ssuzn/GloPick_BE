@@ -1,12 +1,6 @@
 import { Request, Response } from "express";
-import {
-  CountryRecommendationProfile,
-  CountryRecommendation,
-} from "../types/countryRecommendation";
-import {
-  CountryRecommendationService,
-  saveWeights,
-} from "../services/countryRecommendationService";
+import { CountryRecommendationProfile } from "../types/countryRecommendation";
+import { CountryRecommendationService } from "../services/countryRecommendationService";
 import { asyncHandler } from "../utils/asyncHandler";
 import { SUPPORTED_LANGUAGES, JOB_FIELDS } from "../constants/dropdownOptions";
 import { BadRequestError } from "../errors/BadRequestError";
@@ -84,17 +78,14 @@ export const getGuestCountryRecommendations = asyncHandler(
       weights: finalWeights,
     });
 
-    // 가중치를 서비스에서 사용할 수 있도록 저장
-    saveWeights({
-      language: finalWeights.languageWeight,
-      job: finalWeights.jobWeight,
-      qualityOfLife: finalWeights.qualityOfLifeWeight,
-    });
-
-    // 국가 추천 서비스 호출 (회원과 동일한 로직)
-    const recommendations: CountryRecommendation[] =
+    const recommendations =
       await CountryRecommendationService.getTopCountryRecommendations(
         userProfile,
+        {
+          language: finalWeights.languageWeight,
+          job: finalWeights.jobWeight,
+          qualityOfLife: finalWeights.qualityOfLifeWeight,
+        },
       );
 
     res.status(200).json({

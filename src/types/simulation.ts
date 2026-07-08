@@ -2,7 +2,6 @@ import {
   DepartureAirport,
   InitialBudget,
   SimulationInput,
-  SimulationResult,
 } from "../generated/prisma/client";
 
 export interface SaveSimulationParams {
@@ -70,5 +69,3 @@ export interface GPTSimulationResponse {
     koreanResourcesLinks?: string[];
   };
 }
-
-export type SimulationResultRecord = SimulationResult;
