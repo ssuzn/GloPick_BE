@@ -1,6 +1,17 @@
 import { prisma } from "../../db";
 
 export class SimulationListService {
+  static async findByUserId(userId: number) {
+    return prisma.simulationList.findMany({
+      where: {
+        userId,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+  }
+
   static async findSimulationListItem(
     userId: number,
     job: string,

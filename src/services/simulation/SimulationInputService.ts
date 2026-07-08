@@ -2,7 +2,7 @@ import { prisma } from "../../db";
 import { UpdateSimulationInputData } from "../../types/simulation";
 
 export class SimulationInputService {
-  static async findSimulationInput(id: number, userId: number) {
+  static async findById(id: number, userId: number) {
     return prisma.simulationInput.findFirst({
       where: { id, userId },
     });

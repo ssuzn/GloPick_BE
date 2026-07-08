@@ -1,37 +1,34 @@
 import { Request, Response } from "express";
 import { AuthRequest } from "../middlewares/authMiddleware";
-import { prisma } from "../db";
 import { createFlightLinks } from "../utils/flightLinkGenerator";
 import { searchFacilities, getCityCenter } from "../services/googleMapsService";
 import { validateSimulationInput } from "../utils/simulationValidator";
 import { createCityRecommendations } from "../services/cityRecommendationService";
 import {
+  googleMapsTestSchema,
+  recommendCitiesParamsSchema,
   recommendCitiesSchema,
   saveSimulationInputSchema,
-} from "../validators/simulation.schema";
+  saveSimulationParamsSchema,
+  simulationIdParamsSchema,
+} from "../schemas/simulation.schema";
 import { BadRequestError } from "../errors/BadRequestError";
 import { SimulationInputService } from "../services/simulation/simulationInputService";
 import { SimulationService } from "../services/simulationService";
+import { SimulationListService } from "../services/simulation/simulationListService";
 
 export const saveSimulationInput = async (req: AuthRequest, res: Response) => {
-  const { id } = req.params;
-  const parseResult = saveSimulationInputSchema.safeParse(req.body);
-
-  if (!parseResult.success) {
-    throw new BadRequestError(
-      parseResult.error.issues[0]?.message || "요청값이 올바르지 않습니다.",
-    );
-  }
+  const { id } = saveSimulationParamsSchema.parse(req.params);
 
   const {
     selectedCityIndex,
     initialBudget,
     requiredFacilities,
     departureAirport,
-  } = parseResult.data;
+  } = saveSimulationInputSchema.parse(req.body);
 
-  const input = await SimulationInputService.findSimulationInput(
-    Number(id),
+  const input = await SimulationInputService.findById(
+    id,
     req.user!.id,
   );
 
@@ -39,11 +36,7 @@ export const saveSimulationInput = async (req: AuthRequest, res: Response) => {
     throw new BadRequestError("입력 정보를 찾을 수 없습니다.");
   }
 
-  if (selectedCityIndex === undefined || selectedCityIndex === null) {
-    throw new BadRequestError("도시 인덱스를 입력해주세요.");
-  }
-
-  const cityIndex = Number(selectedCityIndex);
+  const cityIndex = selectedCityIndex;
 
   const validation = validateSimulationInput(
     input,
@@ -54,11 +47,7 @@ export const saveSimulationInput = async (req: AuthRequest, res: Response) => {
   );
 
   if (!validation.isValid) {
-    return res.status(validation.error!.code).json({
-      code: validation.error!.code,
-      message: validation.error!.message,
-      data: null,
-    });
+    throw new BadRequestError(validation.error!.message);
   }
 
   const result = await SimulationService.saveSimulation({
@@ -80,22 +69,17 @@ export const saveSimulationInput = async (req: AuthRequest, res: Response) => {
 };
 
 export const recommendCities = async (req: AuthRequest, res: Response) => {
-  const { recommendationId, profileId } = req.params;
-  const parseResult = recommendCitiesSchema.safeParse(req.body);
+  const { recommendationId, profileId } = recommendCitiesParamsSchema.parse(
+    req.params,
+  );
 
-  if (!parseResult.success) {
-    throw new BadRequestError(
-      parseResult.error.issues[0]?.message || "요청값이 올바르지 않습니다.",
-    );
-  }
-
-  const { selectedCountryIndex } = parseResult.data;
+  const { selectedCountryIndex } = recommendCitiesSchema.parse(req.body);
 
   const result = await createCityRecommendations({
     userId: req.user!.id,
-    recommendationId: Number(recommendationId),
-    profileId: Number(profileId),
-    selectedCountryIndex: Number(selectedCountryIndex),
+    recommendationId,
+    profileId,
+    selectedCountryIndex,
   });
 
   return res.status(result.statusCode).json(result.body);
@@ -105,14 +89,9 @@ export const getSimulationFlightLinks = async (
   req: AuthRequest,
   res: Response,
 ) => {
-  const { id } = req.params;
+  const { id } = simulationIdParamsSchema.parse(req.params);
 
-  const simulation = await prisma.simulationInput.findFirst({
-    where: {
-      id: Number(id),
-      userId: req.user!.id,
-    },
-  });
+  const simulation = await SimulationInputService.findById(req.user!.id, id);
 
   if (!simulation) {
     throw new BadRequestError("시뮬레이션 입력 정보를 찾을 수 없습니다.");
@@ -142,14 +121,7 @@ export const getSimulationFlightLinks = async (
 };
 
 export const getSimulationList = async (req: AuthRequest, res: Response) => {
-  const simulations = await prisma.simulationList.findMany({
-    where: {
-      userId: req.user!.id,
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
+  const simulations = await SimulationListService.findByUserId(req.user!.id);
 
   return res.status(200).json({
     code: 200,
@@ -159,11 +131,7 @@ export const getSimulationList = async (req: AuthRequest, res: Response) => {
 };
 
 export const testGoogleMaps = async (req: Request, res: Response) => {
-  const { city, country, facilities } = req.body;
-
-  if (!city || !country || !facilities || !Array.isArray(facilities)) {
-    throw new BadRequestError("city, country, facilities(배열)가 필요합니다.");
-  }
+  const { city, country, facilities } = googleMapsTestSchema.parse(req.body);
 
   const mapCenter = await getCityCenter(city, country);
   const facilityLocations = await searchFacilities(city, country, facilities);
