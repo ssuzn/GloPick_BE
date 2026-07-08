@@ -1,7 +1,6 @@
 import { Request, Response } from "express";
 import bcrypt from "bcrypt";
 import axios from "axios";
-import { prisma } from "../db";
 import { generateToken } from "../utils/generateToken";
 import { BadRequestError } from "../errors/BadRequestError";
 import { UnauthorizedError } from "../errors/UnauthorizedError";

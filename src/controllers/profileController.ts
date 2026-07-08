@@ -1,5 +1,4 @@
 import { Request, Response } from "express";
-import { prisma } from "../db";
 import { AuthRequest } from "../middlewares/authMiddleware";
 import {
   JOB_FIELDS,
@@ -8,6 +7,7 @@ import {
 } from "../constants/dropdownOptions";
 import { DesiredJob, Language } from "../generated/prisma/client";
 import { BadRequestError } from "../errors/BadRequestError";
+import { ProfileService } from "../services/profileService";
 
 const toDesiredJobEnum = (desiredJob: string): DesiredJob => {
   return `JOB_${desiredJob}` as DesiredJob;
@@ -74,11 +74,7 @@ export const createProfile = async (req: AuthRequest, res: Response) => {
   const prismaDesiredJob = toDesiredJobEnum(desiredJob);
   const prismaLanguage = toLanguageEnum(language);
 
-  const existingProfiles = await prisma.userProfile.findMany({
-    where: {
-      userId: req.user!.id,
-    },
-  });
+  const existingProfiles = await ProfileService.findByUserId(req.user!.id);
 
   const isDuplicate = existingProfiles.find((profile) => {
     return (
@@ -101,22 +97,20 @@ export const createProfile = async (req: AuthRequest, res: Response) => {
     );
   }
 
-  const profile = await prisma.userProfile.create({
-    data: {
-      userId: req.user!.id,
-      language: prismaLanguage,
-      desiredJob: prismaDesiredJob,
+  const profile = await ProfileService.create({
+    userId: req.user!.id,
+    language: prismaLanguage,
+    desiredJob: prismaDesiredJob,
 
-      incomeWeight: finalQualityWeights.income,
-      jobsWeight: finalQualityWeights.jobs,
-      healthWeight: finalQualityWeights.health,
-      lifeSatisfactionWeight: finalQualityWeights.lifeSatisfaction,
-      safetyWeight: finalQualityWeights.safety,
+    incomeWeight: finalQualityWeights.income,
+    jobsWeight: finalQualityWeights.jobs,
+    healthWeight: finalQualityWeights.health,
+    lifeSatisfactionWeight: finalQualityWeights.lifeSatisfaction,
+    safetyWeight: finalQualityWeights.safety,
 
-      languageWeight: finalWeights.languageWeight,
-      jobWeight: finalWeights.jobWeight,
-      qualityOfLifeWeight: finalWeights.qualityOfLifeWeight,
-    },
+    languageWeight: finalWeights.languageWeight,
+    jobWeight: finalWeights.jobWeight,
+    qualityOfLifeWeight: finalWeights.qualityOfLifeWeight,
   });
 
   res.status(201).json({
