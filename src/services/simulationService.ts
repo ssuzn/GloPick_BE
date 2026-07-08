@@ -5,11 +5,11 @@ import {
   toDepartureAirportEnum,
 } from "../utils/simulationValidator";
 import { SaveSimulationParams } from "../types/simulation";
-import { SimulationInputService } from "./simulation/SimulationInputService";
-import { SimulationResultService } from "./simulation/SimulationResultService";
+import { SimulationInputService } from "./simulation/simulationInputService";
+import { SimulationResultService } from "./simulation/simulationResultService";
 import { SimulationInput, SimulationResult } from "../generated/prisma/client";
-import { SimulationListService } from "./simulation/SimulationListService";
-import { SimulationMapper } from "../mappers/SimulationMapper";
+import { SimulationListService } from "./simulation/simulationListService";
+import { SimulationMapper } from "../mappers/simulationMapper";
 
 export class SimulationService {
   static getDesiredJobName = (desiredJob?: string | null) => {

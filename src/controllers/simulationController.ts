@@ -10,7 +10,7 @@ import {
   saveSimulationInputSchema,
 } from "../validators/simulation.schema";
 import { BadRequestError } from "../errors/BadRequestError";
-import { SimulationInputService } from "../services/simulation/SimulationInputService";
+import { SimulationInputService } from "../services/simulation/simulationInputService";
 import { SimulationService } from "../services/simulationService";
 
 export const saveSimulationInput = async (req: AuthRequest, res: Response) => {

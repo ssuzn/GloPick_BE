@@ -1,20 +1,20 @@
-import { JOB_FIELDS } from "../constants/dropdownOptions";
 import { prisma } from "../db";
 import { BadRequestError } from "../errors/BadRequestError";
 import { ConflictError } from "../errors/ConflictError";
 import { NotFoundError } from "../errors/NotFoundError";
 import { UserProfile } from "../generated/prisma/client";
-import { RecommendationMapper } from "../mappers/RecommendationMapper";
+import { RecommendationMapper } from "../mappers/recommendationMapper";
 import {
   CountryData,
   ScoredCountry,
   CountryRecommendation,
   CountryRecommendationProfile,
   ISCOJobField,
-  QualityOfLifeWeights,
   RecommendationWeights,
 } from "../types/countryRecommendation";
 import { ExternalAPIService } from "./externalAPIService";
+import { findJobFieldByCode, toJobCode } from "./jobFieldService";
+import { normalizeLanguage } from "./languageService";
 import { oecdService } from "./oecdService";
 
 export class CountryRecommendationService {
@@ -75,12 +75,11 @@ export class CountryRecommendationService {
       safety: dbProfile.safetyWeight,
     };
 
-    const jobCode = this.toJobCode(dbProfile.desiredJob);
-    const jobField =
-      JOB_FIELDS.find((field) => field.code === jobCode) || JOB_FIELDS[1];
+    const jobCode = toJobCode(dbProfile.desiredJob);
+    const jobField = findJobFieldByCode(jobCode);
 
     const userProfile: CountryRecommendationProfile = {
-      language: this.normalizeLanguage(dbProfile.language),
+      language: normalizeLanguage(dbProfile.language),
       jobField: {
         code: jobField.code,
         nameKo: jobField.nameKo,
@@ -371,44 +370,6 @@ export class CountryRecommendationService {
     }
 
     return reasons.length > 0 ? reasons : ["종합적인 생활 환경 고려"];
-  }
-
-  private static normalizeLanguage(language: string): string {
-    const languageMap: Record<string, string> = {
-      Korean: "korean",
-      English: "english",
-      Spanish: "spanish",
-      French: "french",
-      German: "german",
-      Portuguese: "portuguese",
-      Italian: "italian",
-      Dutch: "dutch",
-      Swedish: "swedish",
-      Norwegian: "norwegian",
-      Danish: "danish",
-      Finnish: "finnish",
-      Polish: "polish",
-      Czech: "czech",
-      Hungarian: "hungarian",
-      Greek: "greek",
-      Turkish: "turkish",
-      Japanese: "japanese",
-      Chinese: "chinese",
-      Hebrew: "hebrew",
-      Slovak: "slovak",
-      Slovene: "slovene",
-      Icelandic: "icelandic",
-      Estonian: "estonian",
-      Latvian: "latvian",
-      Lithuanian: "lithuanian",
-      Other: "english",
-    };
-
-    return languageMap[language] || "english";
-  }
-
-  private static toJobCode(desiredJob: string): string {
-    return desiredJob.replace("JOB_", "");
   }
 
   private static async findUserProfile(userId: number, profileId: number) {

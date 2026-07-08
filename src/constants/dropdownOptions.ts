@@ -1,5 +1,3 @@
-// 클라이언트에서 사용할 드롭다운 옵션 데이터
-
 // 지원 가능한 언어 목록 (OECD 40개국 공식 언어 전체 포함)
 export const SUPPORTED_LANGUAGES = [
   "Korean",
@@ -306,22 +304,6 @@ export const FACILITIES_BY_CATEGORY = {
     facilities: REQUIRED_FACILITIES.filter((f) => f.category === "religious"),
   },
 } as const;
-
-/**
- * 시설의 최대 검색 개수 가져오기
- */
-export const getFacilityMaxResults = (facilityValue: string): number => {
-  const facility = REQUIRED_FACILITIES.find((f) => f.value === facilityValue);
-  return facility?.maxResults || 5;
-};
-
-/**
- * 시설 value로 label 가져오기
- */
-export const getFacilityLabel = (facilityValue: string): string => {
-  const facility = REQUIRED_FACILITIES.find((f) => f.value === facilityValue);
-  return facility?.label || facilityValue;
-};
 
 // 타입 정의
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];

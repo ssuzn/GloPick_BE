@@ -1,5 +1,5 @@
-import { getSimpleCityRecommendations } from "./gptsimulationService";
-import { SimulationInputService } from "./simulation/SimulationInputService";
+import { getSimpleCityRecommendations } from "./gptSimulationService";
+import { SimulationInputService } from "./simulation/simulationInputService";
 import { SimulationService } from "./simulationService";
 
 type CityRecommendation = {
