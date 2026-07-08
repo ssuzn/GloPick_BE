@@ -1,0 +1,30 @@
+// 지원 가능한 언어 목록 (OECD 40개국 공식 언어 전체 포함)
+export const SUPPORTED_LANGUAGES = [
+  "Korean",
+  "English",
+  "Spanish",
+  "French",
+  "German",
+  "Portuguese",
+  "Italian",
+  "Dutch",
+  "Swedish",
+  "Norwegian",
+  "Danish",
+  "Finnish",
+  "Polish",
+  "Czech",
+  "Hungarian",
+  "Greek",
+  "Turkish",
+  "Japanese",
+  "Hebrew",
+  "Slovak",
+  "Slovene",
+  "Icelandic",
+  "Estonian",
+  "Latvian",
+  "Lithuanian",
+] as const;
+
+export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
