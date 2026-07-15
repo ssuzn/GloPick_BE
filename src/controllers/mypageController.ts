@@ -1,136 +1,22 @@
 import { Response } from "express";
 import bcrypt from "bcrypt";
-import { prisma } from "../db";
 import { AuthRequest } from "../middlewares/authMiddleware";
 import { NotFoundError } from "../errors/NotFoundError";
 import { ConflictError } from "../errors/ConflictError";
-
-const toJobCode = (desiredJob: string) => desiredJob.replace("JOB_", "");
-
-const formatProfile = (profile: any) => ({
-  profileId: profile.id,
-  language: profile.language,
-  desiredJob: toJobCode(profile.desiredJob),
-  qualityOfLifeWeights: {
-    income: profile.incomeWeight,
-    jobs: profile.jobsWeight,
-    health: profile.healthWeight,
-    lifeSatisfaction: profile.lifeSatisfactionWeight,
-    safety: profile.safetyWeight,
-  },
-  weights: {
-    languageWeight: profile.languageWeight,
-    jobWeight: profile.jobWeight,
-    qualityOfLifeWeight: profile.qualityOfLifeWeight,
-  },
-  createdAt: profile.createdAt,
-});
-
-const formatSimulationResult = (sim: any) => ({
-  id: sim.id,
-  input: sim.input
-    ? {
-        inputId: sim.input.id,
-        selectedCountry: sim.input.selectedCountry,
-        selectedCity: sim.input.selectedCity,
-        initialBudget: sim.input.initialBudget,
-        requiredFacilities: sim.input.requiredFacilities,
-        departureAirport: sim.input.departureAirport,
-        recommendedCities: sim.input.recommendedCities,
-      }
-    : null,
-  country: sim.country,
-  result: {
-    recommendedCity: sim.recommendedCity,
-    localInfo: {
-      essentialFacilities: sim.essentialFacilities,
-      publicTransport: sim.publicTransport,
-      safetyLevel: sim.safetyLevel,
-      climateSummary: sim.climateSummary,
-      koreanCommunity: sim.koreanCommunity,
-      culturalTips: sim.culturalTips,
-      warnings: sim.warnings,
-    },
-    estimatedMonthlyCost: {
-      housing: sim.housing,
-      food: sim.food,
-      transportation: sim.transportation,
-      etc: sim.etc,
-      total: sim.total,
-      oneYearCost: sim.oneYearCost,
-      costCuttingTips: sim.costCuttingTips,
-      cpi: sim.cpi,
-    },
-    initialSetup: {
-      shortTermHousingOptions: sim.shortTermHousingOptions,
-      longTermHousingPlatforms: sim.longTermHousingPlatforms,
-      mobilePlan: sim.mobilePlan,
-      bankAccount: sim.bankAccount,
-    },
-    jobReality: {
-      jobSearchPlatforms: sim.jobSearchPlatforms,
-      languageRequirement: sim.languageRequirement,
-      visaLimitationTips: sim.visaLimitationTips,
-    },
-    culturalIntegration: {
-      koreanPopulationRate: sim.koreanPopulationRate,
-      foreignResidentRatio: sim.foreignResidentRatio,
-      koreanResourcesLinks: sim.koreanResourcesLinks,
-    },
-    facilityLocations: sim.facilityLocations,
-  },
-  createdAt: sim.createdAt,
-});
-
-const formatRecommendationResult = (rec: any) => ({
-  id: rec.id,
-  profile: rec.profile ? formatProfile(rec.profile) : null,
-  recommendations: rec.recommendations.map((country: any) => ({
-    country: country.country,
-    score: country.score,
-    rank: country.rank,
-    details: {
-      languageScore: country.languageScore,
-      jobScore: country.jobScore,
-      qualityOfLifeScore: country.qualityOfLifeScore,
-    },
-    qualityOfLifeData: {
-      income: country.income,
-      jobs: country.jobs,
-      health: country.health,
-      lifeSatisfaction: country.lifeSatisfaction,
-      safety: country.safety,
-    },
-    countryInfo: {
-      region: country.region,
-      languages: country.languages,
-      population: country.population,
-      employmentRate: country.employmentRate,
-    },
-  })),
-  weights: {
-    language: rec.languageWeight,
-    job: rec.jobWeight,
-    qualityOfLife: rec.qualityOfLifeWeight,
-  },
-  createdAt: rec.createdAt,
-});
+import { MyPageUserService } from "../services/myPage/myPageUserService";
+import { MyPageProfileService } from "../services/myPage/myPageProfileService";
+import { MyPageSimulationService } from "../services/myPage/myPageSimulationService";
+import { MyPageRecommendationService } from "../services/myPage/myPageRecommendationService";
+import { ProfileMapper } from "../mappers/profileMapper";
+import { MyPageSimulationMapper } from "../mappers/myPageSimulationMapper";
+import { MyPageRecommendationMapper } from "../mappers/myPageRecommendationMapper";
 
 export const getUserInfo = async (req: AuthRequest, res: Response) => {
   if (!req.user) {
     throw new NotFoundError("사용자 정보가 존재하지 않습니다.");
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: req.user.id },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      birth: true,
-      phone: true,
-    },
-  });
+  const user = await MyPageUserService.findById(req.user.id);
 
   if (!user) {
     throw new NotFoundError("사용자 정보가 존재하지 않습니다.");
@@ -152,18 +38,14 @@ export const getUserInfo = async (req: AuthRequest, res: Response) => {
 export const updateUserInfo = async (req: AuthRequest, res: Response) => {
   const { name, email, password, birth, phone } = req.body;
 
-  const user = await prisma.user.findUnique({
-    where: { id: req.user!.id },
-  });
+  const user = await MyPageUserService.findById(req.user!.id);
 
   if (!user) {
     throw new NotFoundError("사용자 정보가 존재하지 않습니다.");
   }
 
   if (email && email !== user.email) {
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-    });
+    const existingUser = await MyPageUserService.findByEmail(email);
 
     if (existingUser) {
       throw new ConflictError("이미 사용 중인 이메일입니다.");
@@ -175,15 +57,13 @@ export const updateUserInfo = async (req: AuthRequest, res: Response) => {
       ? await bcrypt.hash(password.trim(), 10)
       : undefined;
 
-  const updatedUser = await prisma.user.update({
-    where: { id: req.user!.id },
-    data: {
-      ...(name && { name }),
-      ...(email && { email }),
-      ...(birth && { birth }),
-      ...(phone && { phone }),
-      ...(hashedPassword && { password: hashedPassword }),
-    },
+  const updatedUser = await MyPageUserService.update({
+    id: req.user!.id,
+    ...(name && { name }),
+    ...(email && { email }),
+    ...(birth && { birth }),
+    ...(phone && { phone }),
+    ...(hashedPassword && { password: hashedPassword }),
   });
 
   return res.status(200).json({
@@ -200,17 +80,13 @@ export const updateUserInfo = async (req: AuthRequest, res: Response) => {
 };
 
 export const deleteUser = async (req: AuthRequest, res: Response) => {
-  const user = await prisma.user.findUnique({
-    where: { id: req.user!.id },
-  });
+  const user = await MyPageUserService.findById(req.user!.id);
 
   if (!user) {
     throw new NotFoundError("사용자 정보가 존재하지 않습니다.");
   }
 
-  await prisma.user.delete({
-    where: { id: req.user!.id },
-  });
+  await MyPageUserService.delete(req.user!.id);
 
   return res.status(200).json({
     code: 200,
@@ -220,10 +96,7 @@ export const deleteUser = async (req: AuthRequest, res: Response) => {
 };
 
 export const getProfile = async (req: AuthRequest, res: Response) => {
-  const profiles = await prisma.userProfile.findMany({
-    where: { userId: req.user!.id },
-    orderBy: { createdAt: "desc" },
-  });
+  const profiles = await MyPageProfileService.findByUserId(req.user!.id);
 
   if (profiles.length === 0) {
     throw new NotFoundError("사용자 이력 정보가 존재하지 않습니다.");
@@ -232,19 +105,14 @@ export const getProfile = async (req: AuthRequest, res: Response) => {
   return res.status(200).json({
     code: 200,
     message: "이력 정보 조회 성공",
-    data: profiles.map(formatProfile),
+    data: profiles.map(ProfileMapper.toResponse),
   });
 };
 
 export const updateProfile = async (req: AuthRequest, res: Response) => {
   const profileId = Number(req.params.id);
 
-  const profile = await prisma.userProfile.findFirst({
-    where: {
-      id: profileId,
-      userId: req.user!.id,
-    },
-  });
+  const profile = await MyPageProfileService.findById(profileId, req.user!.id);
 
   if (!profile) {
     throw new NotFoundError("이력을 찾을 수 없습니다.");
@@ -252,50 +120,40 @@ export const updateProfile = async (req: AuthRequest, res: Response) => {
 
   const { language, desiredJob, qualityOfLifeWeights, weights } = req.body;
 
-  const updatedProfile = await prisma.userProfile.update({
-    where: { id: profileId },
-    data: {
-      ...(language && { language }),
-      ...(desiredJob && { desiredJob: `JOB_${desiredJob}` }),
-      ...(qualityOfLifeWeights && {
-        incomeWeight: qualityOfLifeWeights.income,
-        jobsWeight: qualityOfLifeWeights.jobs,
-        healthWeight: qualityOfLifeWeights.health,
-        lifeSatisfactionWeight: qualityOfLifeWeights.lifeSatisfaction,
-        safetyWeight: qualityOfLifeWeights.safety,
-      }),
-      ...(weights && {
-        languageWeight: weights.languageWeight,
-        jobWeight: weights.jobWeight,
-        qualityOfLifeWeight: weights.qualityOfLifeWeight,
-      }),
-    },
+  const updatedProfile = await MyPageProfileService.update(profileId, {
+    ...(language && { language }),
+    ...(desiredJob && { desiredJob: `JOB_${desiredJob}` }),
+    ...(qualityOfLifeWeights && {
+      incomeWeight: qualityOfLifeWeights.income,
+      jobsWeight: qualityOfLifeWeights.jobs,
+      healthWeight: qualityOfLifeWeights.health,
+      lifeSatisfactionWeight: qualityOfLifeWeights.lifeSatisfaction,
+      safetyWeight: qualityOfLifeWeights.safety,
+    }),
+    ...(weights && {
+      languageWeight: weights.languageWeight,
+      jobWeight: weights.jobWeight,
+      qualityOfLifeWeight: weights.qualityOfLifeWeight,
+    }),
   });
 
   return res.status(200).json({
     code: 200,
     message: "이력 정보 수정 성공",
-    data: formatProfile(updatedProfile),
+    data: ProfileMapper.toResponse(updatedProfile),
   });
 };
 
 export const deleteProfile = async (req: AuthRequest, res: Response) => {
   const profileId = Number(req.params.id);
 
-  const profile = await prisma.userProfile.findFirst({
-    where: {
-      id: profileId,
-      userId: req.user!.id,
-    },
-  });
+  const profile = await MyPageProfileService.findById(profileId, req.user!.id);
 
   if (!profile) {
     throw new NotFoundError("이력을 찾을 수 없습니다.");
   }
 
-  await prisma.userProfile.delete({
-    where: { id: profileId },
-  });
+  await MyPageProfileService.delete(profileId);
 
   return res.status(200).json({
     code: 200,
@@ -305,11 +163,7 @@ export const deleteProfile = async (req: AuthRequest, res: Response) => {
 };
 
 export const getUserSimulations = async (req: AuthRequest, res: Response) => {
-  const simulations = await prisma.simulationResult.findMany({
-    where: { userId: req.user!.id },
-    include: { input: true },
-    orderBy: { createdAt: "desc" },
-  });
+  const simulations = await MyPageSimulationService.findByUserId(req.user!.id);
 
   if (simulations.length === 0) {
     throw new NotFoundError("저장된 시뮬레이션 결과가 없습니다.");
@@ -318,7 +172,7 @@ export const getUserSimulations = async (req: AuthRequest, res: Response) => {
   return res.status(200).json({
     code: 200,
     message: "시뮬레이션 결과 조회 성공",
-    data: simulations.map(formatSimulationResult),
+    data: simulations.map(MyPageSimulationMapper.toResponse),
   });
 };
 
@@ -326,16 +180,9 @@ export const getUserRecommendations = async (
   req: AuthRequest,
   res: Response,
 ) => {
-  const recommendations = await prisma.countryRecommendationResult.findMany({
-    where: { userId: req.user!.id },
-    include: {
-      profile: true,
-      recommendations: {
-        orderBy: { rank: "asc" },
-      },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const recommendations = await MyPageRecommendationService.findByUserId(
+    req.user!.id,
+  );
 
   if (recommendations.length === 0) {
     throw new NotFoundError("저장된 추천 결과가 없습니다.");
@@ -344,7 +191,7 @@ export const getUserRecommendations = async (
   return res.status(200).json({
     code: 200,
     message: "추천 결과 조회 성공",
-    data: recommendations.map(formatRecommendationResult),
+    data: recommendations.map(MyPageRecommendationMapper.toResponse),
   });
 };
 
@@ -354,19 +201,10 @@ export const getRecommendationsByProfileId = async (
 ) => {
   const { profileId } = req.params;
 
-  const recommendations = await prisma.countryRecommendationResult.findMany({
-    where: {
-      userId: req.user!.id,
-      profileId: Number(profileId),
-    },
-    include: {
-      profile: true,
-      recommendations: {
-        orderBy: { rank: "asc" },
-      },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const recommendations = await MyPageRecommendationService.findByProfileId(
+    req.user!.id,
+    Number(profileId),
+  );
 
   if (recommendations.length === 0) {
     throw new NotFoundError("해당 이력에 대한 추천 결과가 없습니다.");
@@ -375,7 +213,7 @@ export const getRecommendationsByProfileId = async (
   return res.status(200).json({
     code: 200,
     message: "추천 결과 조회 성공",
-    data: recommendations.map(formatRecommendationResult),
+    data: recommendations.map(MyPageRecommendationMapper.toResponse),
   });
 };
 
@@ -385,16 +223,10 @@ export const getSimulationsByProfileId = async (
 ) => {
   const { profileId } = req.params;
 
-  const simulations = await prisma.simulationResult.findMany({
-    where: {
-      userId: req.user!.id,
-      input: {
-        profileId: Number(profileId),
-      },
-    },
-    include: { input: true },
-    orderBy: { createdAt: "desc" },
-  });
+  const simulations = await MyPageSimulationService.findByProfileId(
+    req.user!.id,
+    Number(profileId),
+  );
 
   if (simulations.length === 0) {
     throw new NotFoundError("해당 이력에 대한 시뮬레이션 결과가 없습니다.");
@@ -403,6 +235,6 @@ export const getSimulationsByProfileId = async (
   return res.status(200).json({
     code: 200,
     message: "시뮬레이션 결과 조회 성공",
-    data: simulations.map(formatSimulationResult),
+    data: simulations.map(MyPageSimulationMapper.toResponse),
   });
 };

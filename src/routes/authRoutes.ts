@@ -5,7 +5,6 @@ import {
   getKakaoAuthUrl,
   kakaoCallback,
 } from "../controllers/authController";
-import { protect } from "../middlewares/authMiddleware";
 import { asyncHandler } from "../utils/asyncHandler";
 
 const router = express.Router();

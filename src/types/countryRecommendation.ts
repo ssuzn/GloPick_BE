@@ -1,29 +1,35 @@
+export interface ISCOJobField {
+  code: string;
+  nameKo: string;
+  nameEn: string;
+}
+
+export interface QualityOfLifeWeights {
+  income: number;
+  jobs: number;
+  health: number;
+  lifeSatisfaction: number;
+  safety: number;
+}
+
+export interface RecommendationWeights {
+  language: number;
+  job: number;
+  qualityOfLife: number;
+}
+
 export interface CountryRecommendationProfile {
   language: string;
 
-  jobField: {
-    code: string;
-    nameKo: string;
-    nameEn: string;
-  };
+  jobField: ISCOJobField;
 
-  qualityOfLifeWeights: {
-    income: number;
-    jobs: number;
-    health: number;
-    lifeSatisfaction: number;
-    safety: number;
-  };
+  qualityOfLifeWeights: QualityOfLifeWeights;
 
   languageScore?: number;
   jobScore?: number;
   qualityOfLifeScore?: number;
 
-  weights?: {
-    languageWeight: number;
-    jobWeight: number;
-    qualityOfLifeWeight: number;
-  };
+  weights?: RecommendationWeights;
 }
 
 // 국가 데이터 타입

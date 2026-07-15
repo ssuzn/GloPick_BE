@@ -1,11 +1,6 @@
-import { getSimpleCityRecommendations } from "./gptsimulationService";
-import {
-  createCityRecommendationInput,
-  findLatestSimulationInputByCountry,
-  findRecommendationWithItems,
-  findUserProfile,
-  getDesiredJobName,
-} from "./simulationService";
+import { getSimpleCityRecommendations } from "./gptSimulationService";
+import { SimulationInputService } from "./simulation/simulationInputService";
+import { SimulationService } from "./simulationService";
 
 type CityRecommendation = {
   name: string;
@@ -23,11 +18,12 @@ export const createCityRecommendations = async ({
   profileId: number;
   selectedCountryIndex: number;
 }) => {
-  const recommendation = await findRecommendationWithItems(
-    recommendationId,
-    userId,
-    profileId,
-  );
+  const recommendation =
+    await SimulationInputService.findRecommendationWithItems(
+      recommendationId,
+      userId,
+      profileId,
+    );
 
   if (!recommendation) {
     return {
@@ -57,11 +53,12 @@ export const createCityRecommendations = async ({
   const selectedCountry =
     recommendation.recommendations[selectedCountryIndex].country;
 
-  const existingInput = await findLatestSimulationInputByCountry(
-    userId,
-    profileId,
-    selectedCountry,
-  );
+  const existingInput =
+    await SimulationInputService.findLatestSimulationInputByCountry(
+      userId,
+      profileId,
+      selectedCountry,
+    );
 
   if (existingInput) {
     return {
@@ -79,7 +76,10 @@ export const createCityRecommendations = async ({
     };
   }
 
-  const profile = await findUserProfile(profileId, userId);
+  const profile = await SimulationInputService.findUserProfile(
+    profileId,
+    userId,
+  );
 
   if (!profile) {
     return {
@@ -92,7 +92,7 @@ export const createCityRecommendations = async ({
     };
   }
 
-  const userJob = getDesiredJobName(profile.desiredJob);
+  const userJob = SimulationService.getDesiredJobName(profile.desiredJob);
   const userLanguage = profile.language;
 
   const cityRecommendations = (await getSimpleCityRecommendations(
@@ -101,7 +101,7 @@ export const createCityRecommendations = async ({
     userLanguage || undefined,
   )) as CityRecommendation[];
 
-  const newInput = await createCityRecommendationInput(
+  const newInput = await SimulationInputService.createCityRecommendationInput(
     userId,
     profileId,
     selectedCountry,

@@ -7,6 +7,147 @@ datasource db {
   provider = "postgresql"
 }
 
+model User {
+  id                    Int                           @id @default(autoincrement())
+  name                  String
+  email                 String                        @unique
+  password              String?
+  birth                 String?
+  phone                 String?
+  kakaoId               String?                       @unique
+  provider              AuthProvider                  @default(local)
+  createdAt             DateTime                      @default(now())
+  recommendationResults CountryRecommendationResult[]
+  simulationInputs      SimulationInput[]
+  simulationLists       SimulationList[]
+  simulationResults     SimulationResult[]
+  profile               UserProfile[]
+}
+
+model UserProfile {
+  id                     Int                           @id @default(autoincrement())
+  userId                 Int
+  language               Language
+  desiredJob             DesiredJob
+  incomeWeight           Int                           @default(20)
+  jobsWeight             Int                           @default(20)
+  healthWeight           Int                           @default(20)
+  lifeSatisfactionWeight Int                           @default(20)
+  safetyWeight           Int                           @default(20)
+  languageWeight         Int                           @default(30)
+  jobWeight              Int                           @default(30)
+  qualityOfLifeWeight    Int                           @default(40)
+  additionalNotes        String?
+  createdAt              DateTime                      @default(now())
+  recommendationResults  CountryRecommendationResult[]
+  simulationInputs       SimulationInput[]
+  user                   User                          @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model CountryRecommendationResult {
+  id                  Int                         @id @default(autoincrement())
+  userId              Int
+  profileId           Int
+  languageWeight      Float
+  jobWeight           Float
+  qualityOfLifeWeight Float
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @updatedAt
+  recommendations     CountryRecommendationItem[]
+  profile             UserProfile                 @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  user                User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profileFingerprint String
+  algorithmVersion   String @default("v1")
+
+  @@unique([userId, profileFingerprint, algorithmVersion])
+}
+
+model CountryRecommendationItem {
+  id                 Int                         @id @default(autoincrement())
+  resultId           Int
+  country            String
+  score              Float
+  rank               Int
+  languageScore      Float
+  jobScore           Float
+  qualityOfLifeScore Float
+  income             Float?
+  jobs               Float?
+  health             Float?
+  lifeSatisfaction   Float?
+  safety             Float?
+  region             String?
+  languages          String[]
+  population         Float?
+  employmentRate     Float?
+  result             CountryRecommendationResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
+}
+
+model SimulationInput {
+  id                 Int               @id @default(autoincrement())
+  userId             Int
+  profileId          Int
+  selectedCountry    String
+  selectedCity       String?
+  initialBudget      InitialBudget?
+  requiredFacilities String[]
+  departureAirport   DepartureAirport?
+  recommendedCities  String[]
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  profile            UserProfile       @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  result             SimulationResult?
+}
+
+model SimulationList {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  job       String
+  country   String
+  city      String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model SimulationResult {
+  id                       Int             @id @default(autoincrement())
+  userId                   Int
+  inputId                  Int             @unique
+  country                  String
+  recommendedCity          String?
+  essentialFacilities      String[]
+  publicTransport          String?
+  safetyLevel              String?
+  climateSummary           String?
+  koreanCommunity          String?
+  culturalTips             String?
+  warnings                 String?
+  facilityLocations        Json?
+  housing                  String?
+  food                     String?
+  transportation           String?
+  etc                      String?
+  total                    String?
+  oneYearCost              String?
+  costCuttingTips          String?
+  cpi                      String?
+  shortTermHousingOptions  String[]
+  longTermHousingPlatforms String[]
+  mobilePlan               String?
+  bankAccount              String?
+  jobSearchPlatforms       String[]
+  languageRequirement      String?
+  visaLimitationTips       String?
+  koreanPopulationRate     String?
+  foreignResidentRatio     String?
+  koreanResourcesLinks     String[]
+  createdAt                DateTime        @default(now())
+  updatedAt                DateTime        @updatedAt
+  input                    SimulationInput @relation(fields: [inputId], references: [id], onDelete: Cascade)
+  user                     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
 enum AuthProvider {
   local
   kakao
@@ -55,50 +196,6 @@ enum DesiredJob {
   JOB_9
 }
 
-model User {
-  id        Int          @id @default(autoincrement())
-  name      String
-  email     String       @unique
-  password  String?
-  birth     String?
-  phone     String?
-  kakaoId   String?      @unique
-  provider  AuthProvider @default(local)
-  createdAt DateTime     @default(now())
-
-  profile UserProfile[]
-
-  recommendationResults CountryRecommendationResult[]
-  simulationInputs      SimulationInput[]
-  simulationLists       SimulationList[]
-  simulationResults     SimulationResult[]
-}
-
-model UserProfile {
-  id     Int  @id @default(autoincrement())
-  userId Int
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  language   Language
-  desiredJob DesiredJob
-
-  incomeWeight           Int @default(20)
-  jobsWeight             Int @default(20)
-  healthWeight           Int @default(20)
-  lifeSatisfactionWeight Int @default(20)
-  safetyWeight           Int @default(20)
-
-  languageWeight      Int @default(30)
-  jobWeight           Int @default(30)
-  qualityOfLifeWeight Int @default(40)
-
-  additionalNotes String?
-  createdAt       DateTime @default(now())
-
-  recommendationResults CountryRecommendationResult[]
-  simulationInputs      SimulationInput[]
-}
-
 enum InitialBudget {
   BUDGET_300_500
   BUDGET_500_800
@@ -115,131 +212,4 @@ enum DepartureAirport {
   CJJ
   TAE
   MWX
-}
-
-model CountryRecommendationResult {
-  id        Int @id @default(autoincrement())
-  userId    Int
-  profileId Int
-
-  languageWeight      Float
-  jobWeight           Float
-  qualityOfLifeWeight Float
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  profile UserProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
-
-  recommendations CountryRecommendationItem[]
-}
-
-model CountryRecommendationItem {
-  id       Int @id @default(autoincrement())
-  resultId Int
-
-  country String
-  score   Float
-  rank    Int
-
-  languageScore      Float
-  jobScore           Float
-  qualityOfLifeScore Float
-
-  income           Float?
-  jobs             Float?
-  health           Float?
-  lifeSatisfaction Float?
-  safety           Float?
-
-  region         String?
-  languages      String[]
-  population     Float?
-  employmentRate Float?
-
-  result CountryRecommendationResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
-}
-
-model SimulationInput {
-  id        Int @id @default(autoincrement())
-  userId    Int
-  profileId Int
-
-  selectedCountry String
-  selectedCity    String?
-
-  initialBudget      InitialBudget?
-  requiredFacilities String[]
-  departureAirport   DepartureAirport?
-  recommendedCities  String[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  profile UserProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
-
-  result SimulationResult?
-}
-
-model SimulationList {
-  id     Int @id @default(autoincrement())
-  userId Int
-
-  job     String
-  country String
-  city    String
-
-  createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model SimulationResult {
-  id      Int @id @default(autoincrement())
-  userId  Int
-  inputId Int @unique
-
-  country String
-
-  recommendedCity String?
-
-  essentialFacilities String[]
-  publicTransport     String?
-  safetyLevel         String?
-  climateSummary      String?
-  koreanCommunity     String?
-  culturalTips        String?
-  warnings            String?
-
-  facilityLocations Json?
-
-  housing         String?
-  food            String?
-  transportation  String?
-  etc             String?
-  total           String?
-  oneYearCost     String?
-  costCuttingTips String?
-  cpi             String?
-
-  shortTermHousingOptions  String[]
-  longTermHousingPlatforms String[]
-  mobilePlan               String?
-  bankAccount              String?
-
-  jobSearchPlatforms  String[]
-  languageRequirement String?
-  visaLimitationTips  String?
-
-  koreanPopulationRate String?
-  foreignResidentRatio String?
-  koreanResourcesLinks String[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  input SimulationInput @relation(fields: [inputId], references: [id], onDelete: Cascade)
 }

@@ -1,22 +1,11 @@
 import { RequestHandler } from "express";
-import { prisma } from "../db";
+import { RankingService } from "../services/rankingService";
 
 export const getPopularCountries: RequestHandler = async (
   req,
   res,
 ): Promise<void> => {
-  const countries = await prisma.simulationInput.groupBy({
-    by: ["selectedCountry"],
-    where: { selectedCountry: { not: "" } },
-    _count: { selectedCountry: true },
-    orderBy: { _count: { selectedCountry: "desc" } },
-    take: 5,
-  });
-
-  const result = countries.map((item) => ({
-    name: item.selectedCountry,
-    count: item._count.selectedCountry,
-  }));
+  const result = await RankingService.getPopularCountries();
 
   res.status(200).json({
     code: 200,
@@ -29,18 +18,7 @@ export const getPopularCities: RequestHandler = async (
   req,
   res,
 ): Promise<void> => {
-  const cities = await prisma.simulationInput.groupBy({
-    by: ["selectedCity"],
-    where: { selectedCity: { not: null } },
-    _count: { selectedCity: true },
-    orderBy: { _count: { selectedCity: "desc" } },
-    take: 5,
-  });
-
-  const result = cities.map((item) => ({
-    name: item.selectedCity,
-    count: item._count.selectedCity,
-  }));
+  const result = await RankingService.getPopularCities();
 
   res.status(200).json({
     code: 200,
