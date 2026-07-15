@@ -12,6 +12,7 @@ import {
   ISCOJobField,
   RecommendationWeights,
 } from "../types/countryRecommendation";
+import { createRecommendationFingerprint } from "../utils/recommendationFingerprint";
 import { ExternalAPIService } from "./externalAPIService";
 import { findJobFieldByCode, toJobCode } from "./jobFieldService";
 import { normalizeLanguage } from "./languageService";
@@ -28,10 +29,11 @@ export class CountryRecommendationService {
     const { weights, qualityOfLifeWeights, userProfile } =
       this.buildRecommendationContext(dbProfile);
 
+    const fingerprint = createRecommendationFingerprint(userProfile, weights);
+
     const existingRecommendation = await this.findExistingRecommendation(
       userId,
-      profileId,
-      weights,
+      fingerprint,
     );
 
     if (existingRecommendation) {
@@ -48,6 +50,7 @@ export class CountryRecommendationService {
       profileId,
       recommendations,
       weights,
+      fingerprint,
     );
 
     return RecommendationMapper.toResponse(
@@ -97,16 +100,13 @@ export class CountryRecommendationService {
 
   private static async findExistingRecommendation(
     userId: number,
-    profileId: number,
-    weights: RecommendationWeights,
+    fingerprint: string,
   ) {
     return prisma.countryRecommendationResult.findFirst({
       where: {
         userId,
-        profileId,
-        languageWeight: weights.language,
-        jobWeight: weights.job,
-        qualityOfLifeWeight: weights.qualityOfLife,
+        profileFingerprint: fingerprint,
+        algorithmVersion: "v1",
       },
       orderBy: {
         createdAt: "desc",
@@ -425,6 +425,7 @@ export class CountryRecommendationService {
     profileId: number,
     recommendations: CountryRecommendation[],
     weights: RecommendationWeights,
+    fingerprint: string,
   ) {
     const recommendationItems =
       await this.buildRecommendationItems(recommendations);
@@ -433,12 +434,17 @@ export class CountryRecommendationService {
       data: {
         userId,
         profileId,
+
         languageWeight: weights.language,
         jobWeight: weights.job,
         qualityOfLifeWeight: weights.qualityOfLife,
+
         recommendations: {
           create: recommendationItems,
         },
+        
+        profileFingerprint: fingerprint,
+        algorithmVersion: "v1",
       },
     });
 

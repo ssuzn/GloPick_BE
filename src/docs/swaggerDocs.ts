@@ -1,4 +1,3 @@
-// /docs/swaggerDocs.ts
 import { authSwaggerDocs } from "./authDocs";
 import { mypageSwaggerDocs } from "./mypageDocs";
 import { profileSwaggerDocs } from "./profileDocs";

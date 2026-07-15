@@ -46,7 +46,6 @@ export const login = async (req: Request, res: Response) => {
     );
   }
 
-  // 카카오 로그인 사용자 체크
   if (!user.password) {
     throw new UnauthorizedError(
       "카카오 로그인 사용자입니다. 일반 로그인을 이용해주세요.",
@@ -54,11 +53,13 @@ export const login = async (req: Request, res: Response) => {
   }
 
   const isMatch = await bcrypt.compare(password, user.password);
+
   if (!isMatch) {
     throw new UnauthorizedError("비밀번호가 틀렸습니다.");
   }
 
   const token = generateToken(user.id.toString());
+
   console.log(`토큰 : ${token}`);
   res.status(201).json({
     code: 201,
