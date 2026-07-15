@@ -1,4 +1,6 @@
 import axios from "axios";
+import { geminiClient, GEMINI_MODEL } from "../lib/gemini";
+import { cityRecommendationResponseSchema } from "../schemas/gemini.schema";
 
 const GPT_API_URL = process.env.GPT_API_URL!;
 const API_KEY = process.env.API_KEY!;
@@ -241,87 +243,64 @@ export const getSimpleCityRecommendations = async (
   userLanguage?: string,
 ) => {
   const prompt = `
-당신은 ${selectedCountry} 이주 전문가입니다.
+당신은 해외 이주 및 취업 도시 추천 전문가입니다.
 
-${selectedCountry}에서 이주 정착하기 좋은 도시 3곳을 추천해주세요.
-${userJob ? `사용자 희망 직업: ${userJob}` : ""}
-${userLanguage ? `사용자 언어 능력: ${userLanguage}` : ""}
+국가: ${selectedCountry}
+희망 직무: ${userJob ?? "미입력"}
+사용 언어: ${userLanguage ?? "미입력"}
 
-각 도시마다 구체적인 이유와 장점을 포함한 상세한 설명을 제공해주세요.
+해당 국가에서 이주와 취업에 적합한 도시 3곳을 추천하세요.
 
-⚠️ CRITICAL: 모든 내용을 반드시 한국어(Korean)로만 작성하세요. 영어를 사용하지 마세요.
-⚠️ 아래 JSON 형식 그대로만 한글로 응답하세요:
+조건:
+- 모든 설명은 한국어로 작성
+- 도시별 추천 이유를 2~3문장으로 작성
+- 실제 도시만 추천
+- 정확히 3개 도시 반환
+`;
 
-{
-  "cities": [
-    { 
-      "name": "도시명1", 
-      "summary": "이 도시를 추천하는 구체적인 이유와 장점을 포함한 상세 설명 (2-3문장)" 
-    },
-    { 
-      "name": "도시명2", 
-      "summary": "이 도시를 추천하는 구체적인 이유와 장점을 포함한 상세 설명 (2-3문장)" 
-    },
-    { 
-      "name": "도시명3", 
-      "summary": "이 도시를 추천하는 구체적인 이유와 장점을 포함한 상세 설명 (2-3문장)" 
-    }
-  ]
-}`;
-
-  try {
-    const response = await axios.post(
-      GPT_API_URL,
-      {
-        model: "gpt-4",
-        messages: [
-          {
-            role: "system",
-            content:
-              "당신은 도시 이주 추천 전문가입니다. 모든 응답은 반드시 한국어로만 작성해야 합니다. You must respond only in Korean language.",
+  const response = await geminiClient.models.generateContent({
+    model: GEMINI_MODEL,
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseJsonSchema: {
+        type: "object",
+        properties: {
+          cities: {
+            type: "array",
+            minItems: 3,
+            maxItems: 3,
+            items: {
+              type: "object",
+              properties: {
+                name: {
+                  type: "string",
+                },
+                summary: {
+                  type: "string",
+                },
+              },
+              required: ["name", "summary"],
+              additionalProperties: false,
+            },
           },
-          { role: "user", content: prompt },
-        ],
-        max_tokens: 1000,
-        temperature: 0.3,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${API_KEY}`,
-          "Content-Type": "application/json",
         },
+        required: ["cities"],
+        additionalProperties: false,
       },
-    );
+    },
+  });
 
-    const gptRaw = response.data?.choices?.[0]?.message?.content;
-    const parsedResponse = JSON.parse(gptRaw);
-
-    return parsedResponse.cities;
-  } catch (error) {
-    console.error("도시 추천 GPT 호출 실패:", error);
-
-    return [
-      {
-        name: "뉴욕",
-        summary:
-          "다양한 산업과 일자리 기회가 풍부하여 전문가 직군에게 적합합니다.",
-      },
-      {
-        name: "시애틀",
-        summary: "IT 산업과 첨단기업이 많아 취업 기회가 다양합니다.",
-      },
-      {
-        name: "오스틴",
-        summary: "성장하는 도시로 생활비와 일자리의 균형이 좋은 편입니다.",
-      },
-    ];
+  if (!response.text) {
+    throw new Error("Gemini 응답이 비어 있습니다.");
   }
+
+  const parsed = cityRecommendationResponseSchema.parse(
+    JSON.parse(response.text),
+  );
+
+  return parsed.cities;
 };
-//   } catch (error) {
-//     console.error("도시 추천 GPT 호출 실패:", error);
-//     throw new Error("도시 추천에 실패했습니다. 다시 시도해주세요.");
-//   }
-// };
 
 // GPT를 통한 상세 도시 추천 함수
 export async function getDetailedCityRecommendations(

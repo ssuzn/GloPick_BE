@@ -1,4 +1,4 @@
-import { getSimpleCityRecommendations } from "./gptSimulationService";
+import { getSimpleCityRecommendations } from "./geminiSimulationService";
 import { SimulationInputService } from "./simulation/simulationInputService";
 import { SimulationService } from "./simulationService";
 

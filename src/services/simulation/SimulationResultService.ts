@@ -4,7 +4,7 @@ import {
   GPTSimulationResponse,
 } from "../../types/simulation";
 import { createFlightLinks } from "../../utils/flightLinkGenerator";
-import { generateSimulationResponse } from "../gptSimulationService";
+import { generateSimulationResponse } from "../geminiSimulationService";
 import { searchFacilities } from "../googleMapsService";
 import { SimulationMapper } from "../../mappers/simulationMapper";
 
