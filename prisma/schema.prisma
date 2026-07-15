@@ -56,6 +56,10 @@ model CountryRecommendationResult {
   recommendations     CountryRecommendationItem[]
   profile             UserProfile                 @relation(fields: [profileId], references: [id], onDelete: Cascade)
   user                User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profileFingerprint String
+  algorithmVersion   String @default("v1")
+
+  @@unique([userId, profileFingerprint, algorithmVersion])
 }
 
 model CountryRecommendationItem {

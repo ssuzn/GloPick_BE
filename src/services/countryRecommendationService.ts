@@ -1,8 +1,8 @@
 import { prisma } from "../db";
 import { BadRequestError } from "../errors/BadRequestError";
-import { ConflictError } from "../errors/ConflictError";
 import { NotFoundError } from "../errors/NotFoundError";
 import { UserProfile } from "../generated/prisma/client";
+import { MyPageRecommendationMapper } from "../mappers/myPageRecommendationMapper";
 import { RecommendationMapper } from "../mappers/recommendationMapper";
 import {
   CountryData,
@@ -17,6 +17,7 @@ import { ExternalAPIService } from "./externalAPIService";
 import { findJobFieldByCode, toJobCode } from "./jobFieldService";
 import { normalizeLanguage } from "./languageService";
 import { oecdService } from "./oecdService";
+import { RedisService } from "./redisService";
 
 export class CountryRecommendationService {
   static async createRecommendation(userId: number, profileId: number) {
@@ -31,13 +32,36 @@ export class CountryRecommendationService {
 
     const fingerprint = createRecommendationFingerprint(userProfile, weights);
 
+    const cacheKey = this.createCacheKey(userId, fingerprint);
+    const cachedRecommendation =
+      await RedisService.get<
+        ReturnType<typeof RecommendationMapper.toResponse>
+      >(cacheKey);
+    if (cachedRecommendation) {
+      return {
+        ...cachedRecommendation,
+        isExisting: true,
+        cacheSource: "redis" as const,
+      };
+    }
+
     const existingRecommendation = await this.findExistingRecommendation(
       userId,
       fingerprint,
     );
 
     if (existingRecommendation) {
-      throw new ConflictError("이미 존재하는 추천 결과입니다.");
+      const response = MyPageRecommendationMapper.toResponse(
+        existingRecommendation,
+      );
+
+      await RedisService.set(cacheKey, response, this.CACHE_TTL_SECONDS);
+
+      return {
+        ...response,
+        isExisting: true,
+        cacheSource: "database" as const,
+      };
     }
 
     const recommendations = await this.getTopCountryRecommendations(
@@ -53,7 +77,7 @@ export class CountryRecommendationService {
       fingerprint,
     );
 
-    return RecommendationMapper.toResponse(
+    const response = RecommendationMapper.toResponse(
       recommendationId,
       profileId,
       userProfile,
@@ -61,6 +85,14 @@ export class CountryRecommendationService {
       weights,
       qualityOfLifeWeights,
     );
+
+    await RedisService.set(cacheKey, response, this.CACHE_TTL_SECONDS);
+
+    return {
+      ...response,
+      isExisting: false,
+      cacheSource: "calculated" as const,
+    };
   }
 
   private static buildRecommendationContext(dbProfile: UserProfile) {
@@ -106,7 +138,15 @@ export class CountryRecommendationService {
       where: {
         userId,
         profileFingerprint: fingerprint,
-        algorithmVersion: "v1",
+        algorithmVersion: this.ALGORITHM_VERSION,
+      },
+      include: {
+        profile: true,
+        recommendations: {
+          orderBy: {
+            rank: "asc",
+          },
+        },
       },
       orderBy: {
         createdAt: "desc",
@@ -442,12 +482,19 @@ export class CountryRecommendationService {
         recommendations: {
           create: recommendationItems,
         },
-        
+
         profileFingerprint: fingerprint,
-        algorithmVersion: "v1",
+        algorithmVersion: this.ALGORITHM_VERSION,
       },
     });
 
     return savedResult.id;
+  }
+
+  private static readonly ALGORITHM_VERSION = "v1";
+  private static readonly CACHE_TTL_SECONDS = 60 * 60;
+
+  private static createCacheKey(userId: number, fingerprint: string): string {
+    return `recommendation:${this.ALGORITHM_VERSION}:${userId}:${fingerprint}`;
   }
 }
