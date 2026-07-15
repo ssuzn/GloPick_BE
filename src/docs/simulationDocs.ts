@@ -320,7 +320,7 @@ export const simulationSwaggerDocs = {
               },
             },
           },
-          500: { description: "GPT 호출 실패" },
+          500: { description: "AI 모델 호출 실패" },
         },
       },
     },
@@ -328,7 +328,7 @@ export const simulationSwaggerDocs = {
       post: {
         summary: "시뮬레이션 추가 정보 입력 및 즉시 생성",
         description:
-          "도시를 선택하고 추가 정보를 입력하면 자동으로 GPT 기반 시뮬레이션이 생성되어 저장됩니다. 별도의 생성 단계 없이 한 번에 처리됩니다.",
+          "도시를 선택하고 추가 정보를 입력하면 자동으로 Gemini 기반 시뮬레이션이 생성되어 저장됩니다. 별도의 생성 단계 없이 한 번에 처리됩니다.",
         tags: ["Simulation"],
         security: [{ bearerAuth: [] }],
         parameters: [

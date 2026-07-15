@@ -1,50 +1,58 @@
 import { Prisma, SimulationResult } from "../generated/prisma/client";
-import { GPTSimulationResponse } from "../types/simulation";
+import { SimulationGenerationResponse } from "../types/simulation";
+import { FacilityLocation } from "../services/googleMapsService";
 
 export class SimulationMapper {
   static toEntity (
-    gptResult: GPTSimulationResponse,
-    facilityLocations: any = {},
+    generatedSimulation: SimulationGenerationResponse,
+    facilityLocations: Record<string, FacilityLocation[]> = {},
   ) {
     return {
-      recommendedCity: gptResult.recommendedCity ?? null,
+      recommendedCity: generatedSimulation.recommendedCity ?? null,
 
-      essentialFacilities: gptResult.localInfo?.essentialFacilities ?? [],
-      publicTransport: gptResult.localInfo?.publicTransport ?? null,
-      safetyLevel: gptResult.localInfo?.safetyLevel ?? null,
-      climateSummary: gptResult.localInfo?.climateSummary ?? null,
-      koreanCommunity: gptResult.localInfo?.koreanCommunity ?? null,
-      culturalTips: gptResult.localInfo?.culturalTips ?? null,
-      warnings: gptResult.localInfo?.warnings ?? null,
+      essentialFacilities:
+        generatedSimulation.localInfo?.essentialFacilities ?? [],
+      publicTransport: generatedSimulation.localInfo?.publicTransport ?? null,
+      safetyLevel: generatedSimulation.localInfo?.safetyLevel ?? null,
+      climateSummary: generatedSimulation.localInfo?.climateSummary ?? null,
+      koreanCommunity: generatedSimulation.localInfo?.koreanCommunity ?? null,
+      culturalTips: generatedSimulation.localInfo?.culturalTips ?? null,
+      warnings: generatedSimulation.localInfo?.warnings ?? null,
 
       facilityLocations,
 
-      housing: gptResult.estimatedMonthlyCost?.housing ?? null,
-      food: gptResult.estimatedMonthlyCost?.food ?? null,
-      transportation: gptResult.estimatedMonthlyCost?.transportation ?? null,
-      etc: gptResult.estimatedMonthlyCost?.etc ?? null,
-      total: gptResult.estimatedMonthlyCost?.total ?? null,
-      oneYearCost: gptResult.estimatedMonthlyCost?.oneYearCost ?? null,
-      costCuttingTips: gptResult.estimatedMonthlyCost?.costCuttingTips ?? null,
-      cpi: gptResult.estimatedMonthlyCost?.cpi ?? null,
+      housing: generatedSimulation.estimatedMonthlyCost?.housing ?? null,
+      food: generatedSimulation.estimatedMonthlyCost?.food ?? null,
+      transportation:
+        generatedSimulation.estimatedMonthlyCost?.transportation ?? null,
+      etc: generatedSimulation.estimatedMonthlyCost?.etc ?? null,
+      total: generatedSimulation.estimatedMonthlyCost?.total ?? null,
+      oneYearCost:
+        generatedSimulation.estimatedMonthlyCost?.oneYearCost ?? null,
+      costCuttingTips:
+        generatedSimulation.estimatedMonthlyCost?.costCuttingTips ?? null,
+      cpi: generatedSimulation.estimatedMonthlyCost?.cpi ?? null,
 
       shortTermHousingOptions:
-        gptResult.initialSetup?.shortTermHousingOptions ?? [],
+        generatedSimulation.initialSetup?.shortTermHousingOptions ?? [],
       longTermHousingPlatforms:
-        gptResult.initialSetup?.longTermHousingPlatforms ?? [],
-      mobilePlan: gptResult.initialSetup?.mobilePlan ?? null,
-      bankAccount: gptResult.initialSetup?.bankAccount ?? null,
+        generatedSimulation.initialSetup?.longTermHousingPlatforms ?? [],
+      mobilePlan: generatedSimulation.initialSetup?.mobilePlan ?? null,
+      bankAccount: generatedSimulation.initialSetup?.bankAccount ?? null,
 
-      jobSearchPlatforms: gptResult.jobReality?.jobSearchPlatforms ?? [],
-      languageRequirement: gptResult.jobReality?.languageRequirement ?? null,
-      visaLimitationTips: gptResult.jobReality?.visaLimitationTips ?? null,
+      jobSearchPlatforms:
+        generatedSimulation.jobReality?.jobSearchPlatforms ?? [],
+      languageRequirement:
+        generatedSimulation.jobReality?.languageRequirement ?? null,
+      visaLimitationTips:
+        generatedSimulation.jobReality?.visaLimitationTips ?? null,
 
       koreanPopulationRate:
-        gptResult.culturalIntegration?.koreanPopulationRate ?? null,
+        generatedSimulation.culturalIntegration?.koreanPopulationRate ?? null,
       foreignResidentRatio:
-        gptResult.culturalIntegration?.foreignResidentRatio ?? null,
+        generatedSimulation.culturalIntegration?.foreignResidentRatio ?? null,
       koreanResourcesLinks:
-        gptResult.culturalIntegration?.koreanResourcesLinks ?? [],
+        generatedSimulation.culturalIntegration?.koreanResourcesLinks ?? [],
     };
   }
 

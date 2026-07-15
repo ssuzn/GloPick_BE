@@ -6,7 +6,7 @@ import {
 
 const client = new Client({});
 
-export interface FacilityLocation {
+export type FacilityLocation = {
   name: string;
   address: string;
   location: {
@@ -16,7 +16,7 @@ export interface FacilityLocation {
   placeId: string;
   rating?: number;
   types?: string[];
-}
+};
 
 /**
  * Google Maps Places API를 사용하여 특정 도시에서 편의시설을 검색

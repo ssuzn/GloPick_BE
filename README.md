@@ -11,7 +11,7 @@
 ## ✨ Features
 
 ### 🤖 AI Recommendation
-- GPT 기반 국가 및 도시 추천
+- Gemini 기반 도시 추천 및 이주 시뮬레이션
 - 사용자 가중치 기반 개인화 추천
 - 추천 근거 및 점수 제공
 
@@ -49,7 +49,7 @@
                               │
             ┌─────────────────┴─────────────────┐
             ▼                                   ▼
-      OpenAI API                    PostgreSQL + Prisma
+      Gemini API                    PostgreSQL + Prisma
             │                                   │
             └─────────────────┬─────────────────┘
                               ▼
@@ -75,7 +75,7 @@
 | ⚙️ Backend | Node.js · Express · TypeScript |
 | 🗄️ Database | PostgreSQL · Prisma ORM |
 | 📈 Data | Python · Pandas · NumPy · SciPy · Matplotlib |
-| 🤖 AI | OpenAI API |
+| 🤖 AI | Gemini API (`@google/genai`) |
 | 🌍 Data Source | OECD Better Life Index · World Bank · ILOSTAT |
 
 
@@ -218,5 +218,5 @@ npm run test:python
 - World Bank
 - ILOSTAT
 - REST Countries API
-- OpenAI API
+- Gemini API
 ```

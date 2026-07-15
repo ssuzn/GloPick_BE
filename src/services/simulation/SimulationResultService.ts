@@ -1,11 +1,14 @@
 import { prisma } from "../../db";
 import {
   GenerateSimulationResultParams,
-  GPTSimulationResponse,
+  SimulationGenerationResponse,
 } from "../../types/simulation";
 import { createFlightLinks } from "../../utils/flightLinkGenerator";
 import { generateSimulationResponse } from "../geminiSimulationService";
-import { searchFacilities } from "../googleMapsService";
+import {
+  FacilityLocation,
+  searchFacilities,
+} from "../googleMapsService";
 import { SimulationMapper } from "../../mappers/simulationMapper";
 
 export class SimulationResultService {
@@ -22,15 +25,15 @@ export class SimulationResultService {
     userId: number,
     inputId: number,
     selectedCountry: string,
-    gptResult: GPTSimulationResponse,
-    facilityLocations: any = {},
+    generatedSimulation: SimulationGenerationResponse,
+    facilityLocations: Record<string, FacilityLocation[]> = {},
   ) {
     return prisma.simulationResult.create({
       data: {
         userId,
         inputId,
         country: selectedCountry,
-        ...SimulationMapper.toEntity(gptResult, facilityLocations),
+        ...SimulationMapper.toEntity(generatedSimulation, facilityLocations),
       },
     });
   }
@@ -41,12 +44,13 @@ export class SimulationResultService {
     departureAirport,
     selectedCity,
   }: GenerateSimulationResultParams) {
-    const gptResult = await generateSimulationResponse(input);
+    const generatedSimulation = await generateSimulationResponse(input);
 
-    const arrivalAirportCode = gptResult?.nearestAirport?.code || selectedCity;
+    const arrivalAirportCode =
+      generatedSimulation.nearestAirport?.code || selectedCity;
     const flightLinks = createFlightLinks(departureAirport, arrivalAirportCode);
 
-    let facilityLocations = {};
+    let facilityLocations: Record<string, FacilityLocation[]> = {};
 
     if (input.requiredFacilities.length > 0) {
       try {
@@ -64,7 +68,7 @@ export class SimulationResultService {
       userId,
       input.id,
       input.selectedCountry,
-      gptResult,
+      generatedSimulation,
       facilityLocations,
     );
 

@@ -3,6 +3,7 @@ import {
   InitialBudget,
   SimulationInput,
 } from "../generated/prisma/client";
+import type { GeminiSimulation } from "../schemas/geminiSimulation.schema";
 
 export interface SaveSimulationParams {
   input: SimulationInput;
@@ -27,45 +28,9 @@ export interface GenerateSimulationResultParams {
   selectedCity: string;
 }
 
-export interface GPTSimulationResponse {
-  recommendedCity?: string;
+export type SimulationGenerationResponse = GeminiSimulation & {
   nearestAirport?: {
     code?: string;
     name?: string;
   };
-  localInfo?: {
-    essentialFacilities?: string[];
-    publicTransport?: string;
-    safetyLevel?: string;
-    climateSummary?: string;
-    koreanCommunity?: string;
-    culturalTips?: string;
-    warnings?: string;
-  };
-  estimatedMonthlyCost?: {
-    housing?: string;
-    food?: string;
-    transportation?: string;
-    etc?: string;
-    total?: string;
-    oneYearCost?: string;
-    costCuttingTips?: string;
-    cpi?: string;
-  };
-  initialSetup?: {
-    shortTermHousingOptions?: string[];
-    longTermHousingPlatforms?: string[];
-    mobilePlan?: string;
-    bankAccount?: string;
-  };
-  jobReality?: {
-    jobSearchPlatforms?: string[];
-    languageRequirement?: string;
-    visaLimitationTips?: string;
-  };
-  culturalIntegration?: {
-    koreanPopulationRate?: string;
-    foreignResidentRatio?: string;
-    koreanResourcesLinks?: string[];
-  };
-}
+};
